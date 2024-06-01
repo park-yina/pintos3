@@ -94,35 +94,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 err:
 	return false;
 }
-// bool
-// hash_init (struct hash *h, 
-// 			hash_hash_func *hash, hash_less_func *less, void *aux) {
-// 	h->elem_cnt = 0;
-// 	h->bucket_cnt = 4;
-// 	h->buckets = malloc (sizeof *h->buckets * h->bucket_cnt);
-// 	h->hash = hash;
-// 	h->less = less;
-// 	h->aux = aux;
 
-// 	if (h->buckets != NULL) {
-// 		hash_clear (h, NULL);
-// 		return true;
-// 	} else
-// 		return false;
-// }
-unsigned page_hash(const struct hash_elem *h1,void *aux UNUSED){
-	const struct page *p2=hash_entry(p2,struct page, hash_elem);
-	return hash_bytes(&p2->va,sizof(p2->va));
-	//바이트를 구해오기 위해 p2->va의 사이즈를 같이 인자로
-}
-bool page_less(const struct hash_elem *a1, const struct hash_elem *b1,void *aux UNUSED){
-	const struct page *a2= hash_entry(a1,struct page,hash_elem);
-	const struct page *b2= hash_entry(b1,struct page, hash_elem);
-	return a2->va<b2->va;//작은 것을 기준으로 알아서 return
-}
-void supplemental_page_table_init (struct supplemental_page_table *spt UNUSED){
-	hash_init(&spt->sup_hash,page_hash,page_less,NULL);
-}
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
@@ -235,8 +207,34 @@ vm_do_claim_page (struct page *page) {
 }
 
 /* Initialize new supplemental page table */
-void
-supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+// bool
+// hash_init (struct hash *h, 
+// 			hash_hash_func *hash, hash_less_func *less, void *aux) {
+// 	h->elem_cnt = 0;
+// 	h->bucket_cnt = 4;
+// 	h->buckets = malloc (sizeof *h->buckets * h->bucket_cnt);
+// 	h->hash = hash;
+// 	h->less = less;
+// 	h->aux = aux;
+
+// 	if (h->buckets != NULL) {
+// 		hash_clear (h, NULL);
+// 		return true;
+// 	} else
+// 		return false;
+// }
+unsigned page_hash(const struct hash_elem *h1,void *aux UNUSED){
+	const struct page *p2=hash_entry(p2,struct page, hash_elem);
+	return hash_bytes(&p2->va,sizof(p2->va));
+	//바이트를 구해오기 위해 p2->va의 사이즈를 같이 인자로
+}
+bool page_less(const struct hash_elem *a1, const struct hash_elem *b1,void *aux UNUSED){
+	const struct page *a2= hash_entry(a1,struct page,hash_elem);
+	const struct page *b2= hash_entry(b1,struct page, hash_elem);
+	return a2->va<b2->va;//작은 것을 기준으로 알아서 return
+}
+void supplemental_page_table_init (struct supplemental_page_table *spt UNUSED){
+	hash_init(&spt->sup_hash,page_hash,page_less,NULL);
 }
 
 /* Copy supplemental page table from src to dst */
