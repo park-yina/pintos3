@@ -62,16 +62,6 @@ process_create_initd (const char *file_name) {
 		palloc_free_page (fn_copy);
 	return tid;
 }
-struct file *process_get_file(int fd)
-{
-	struct thread *t = thread_current();
-	struct file **fdt = t->file_descriptor_table;
-	if (fd < 2 || fd > FDT_COUNT_LIMIT)
-		return NULL;
-	
-	struct file *file = fdt[fd];
-	return file;
-}
 
 /* A thread function that launches first user process. */
 static void
@@ -272,6 +262,7 @@ process_wait (tid_t child_tid UNUSED) {
  
     return child->exit_status; 
 }
+
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
@@ -820,6 +811,16 @@ int process_add_file(struct file *file) {
 	return fd;
 }
 
+struct file *process_get_file(int fd)
+{
+	struct thread *t = thread_current();
+	struct file **fdt = t->file_descriptor_table;
+	if (fd < 2 || fd > FDT_COUNT_LIMIT)
+		return NULL;
+	
+	struct file *file = fdt[fd];
+	return file;
+}
 
 void process_close_file(int fd)
 {

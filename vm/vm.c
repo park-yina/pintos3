@@ -3,6 +3,10 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+#include "vm/uninit.h"
+#include "vm/anon.h"
+#include "vm/file.h"
+#include "lib/kernel/hash.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -31,7 +35,38 @@ page_get_type (struct page *page) {
 			return ty;
 	}
 }
+// bool
+// hash_init (struct hash *h, 
+// 			hash_hash_func *hash, hash_less_func *less, void *aux) {
+// 	h->elem_cnt = 0;
+// 	h->bucket_cnt = 4;
+// 	h->buckets = malloc (sizeof *h->buckets * h->bucket_cnt);
+// 	h->hash = hash;
+// 	h->less = less;
+// 	h->aux = aux;
 
+// 	if (h->buckets != NULL) {
+// 		hash_clear (h, NULL);
+// 		return true;
+// 	} else
+// 		return false;
+// }
+unsigned page_hash(const struct hash_elem *p_, void *aux UNUSED) {
+    const struct page *p = hash_entry(p_, struct page, hash_elem);
+    return hash_bytes(&p->va, sizeof p->va);
+}
+
+// 해시 테이블 초기화할 때 해시 요소들 비교하는 함수의 포인터
+// a가 b보다 작으면 true, 반대면 false
+bool page_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED) {
+    const struct page *a = hash_entry(a_, struct page, hash_elem);
+    const struct page *b = hash_entry(b_, struct page, hash_elem);
+
+    return a->va < b->va;
+}
+void supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+	hash_init(&spt->sup_hash, page_hash, page_less, NULL);
+}
 /* Helpers */
 static struct frame *vm_get_victim (void);
 static bool vm_do_claim_page (struct page *page);
@@ -59,7 +94,35 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 err:
 	return false;
 }
+// bool
+// hash_init (struct hash *h, 
+// 			hash_hash_func *hash, hash_less_func *less, void *aux) {
+// 	h->elem_cnt = 0;
+// 	h->bucket_cnt = 4;
+// 	h->buckets = malloc (sizeof *h->buckets * h->bucket_cnt);
+// 	h->hash = hash;
+// 	h->less = less;
+// 	h->aux = aux;
 
+// 	if (h->buckets != NULL) {
+// 		hash_clear (h, NULL);
+// 		return true;
+// 	} else
+// 		return false;
+// }
+unsigned page_hash(const struct hash_elem *h1,void *aux UNUSED){
+	const struct page *p2=hash_entry(p2,struct page, hash_elem);
+	return hash_bytes(&p2->va,sizof(p2->va));
+	//바이트를 구해오기 위해 p2->va의 사이즈를 같이 인자로
+}
+bool page_less(const struct hash_elem *a1, const struct hash_elem *b1,void *aux UNUSED){
+	const struct page *a2= hash_entry(a1,struct page,hash_elem);
+	const struct page *b2= hash_entry(b1,struct page, hash_elem);
+	return a2->va<b2->va;//작은 것을 기준으로 알아서 return
+}
+void supplemental_page_table_init (struct supplemental_page_table *spt UNUSED){
+	hash_init(&spt->sup_hash,page_hash,page_less,NULL);
+}
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
