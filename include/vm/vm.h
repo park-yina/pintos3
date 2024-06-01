@@ -38,19 +38,26 @@ struct thread;
  * This is kind of "parent class", which has four "child class"es, which are
  * uninit_page, file_page, anon_page, and page cache (project4).
  * DO NOT REMOVE/MODIFY PREDEFINED MEMBER OF THIS STRUCTURE. */
-struct page {
-	const struct page_operations *operations;
-	void *va;              /* Address in terms of user space */
-	struct frame *frame;   /* Back reference for frame */
+struct page
+{
+    const struct page_operations *operations;
+    void *va;             /* Address in terms of user space */
+    struct frame *frame; /* Back reference for frame */
 
-	union {
-		struct uninit_page uninit;
-		struct anon_page anon;
-		struct file_page file;
+    /* Your implementation */
+    struct hash_elem hash_elem;
+
+    /* Per-type data are binded into the union.
+     * Each function automatically detects the current union */
+    union
+    {
+        struct uninit_page uninit;
+        struct anon_page anon;
+        struct file_page file;
 #ifdef EFILESYS
-		struct page_cache page_cache;
+        struct page_cache page_cache;
 #endif
-	};
+    };
 };
 /* The representation of "frame" */
 struct frame {
@@ -58,8 +65,8 @@ struct frame {
 	struct page *page;
 };
 struct supplemental_page_table {
-        	struct hash sup_hash;
-        };
+    struct hash spt_hash;
+};
 /* The function table for page operations.
  * This is one way of implementing "interface" in C.
  * Put the table of "method" into the struct's member, and

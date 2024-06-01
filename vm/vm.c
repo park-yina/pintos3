@@ -78,7 +78,6 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 err:
 	return false;
 }
-
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
@@ -218,7 +217,7 @@ bool page_less(const struct hash_elem *a1, const struct hash_elem *b1,void *aux 
 	return a2->va<b2->va;//작은 것을 기준으로 알아서 return
 }
 void supplemental_page_table_init (struct supplemental_page_table *spt UNUSED){
-	hash_init(&spt->sup_hash,page_hash,page_less,NULL);
+	hash_init(&spt->spt_hash,page_hash,page_less,NULL);
 }
 
 /* Copy supplemental page table from src to dst */
