@@ -2,7 +2,7 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
-#include  "lib/kernel/hash.h"
+#include "hash.h"
 enum vm_type {
 	/* page not initialized */
 	VM_UNINIT = 0,
@@ -64,9 +64,11 @@ struct frame {
 	void *kva;
 	struct page *page;
 };
-struct supplemental_page_table {
-    struct hash spt_hash;
+struct supplemental_page_table
+{
+	struct hash spt_hash;
 };
+
 /* The function table for page operations.
  * This is one way of implementing "interface" in C.
  * Put the table of "method" into the struct's member, and
