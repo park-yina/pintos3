@@ -208,7 +208,7 @@ vm_do_claim_page (struct page *page) {
 // }
 unsigned page_hash(const struct hash_elem *h1,void *aux UNUSED){
 	const struct page *p2=hash_entry(p2,struct page, hash_elem);
-	return hash_bytes(&p2->va,sizof(p2->va));
+	return hash_bytes(&p2->va,sizeof(p2->va));
 	//바이트를 구해오기 위해 p2->va의 사이즈를 같이 인자로
 }
 bool page_less(const struct hash_elem *a1, const struct hash_elem *b1,void *aux UNUSED){
