@@ -42,11 +42,7 @@ struct page {
 	const struct page_operations *operations;
 	void *va;              /* Address in terms of user space */
 	struct frame *frame;   /* Back reference for frame */
-	struct hash_elem list_elem; //작성하다보니 멤버 변수 필요
-	/* Your implementation */
 
-	/* Per-type data are binded into the union.
-	 * Each function automatically detects the current union */
 	union {
 		struct uninit_page uninit;
 		struct anon_page anon;
@@ -61,7 +57,9 @@ struct frame {
 	void *kva;
 	struct page *page;
 };
-
+struct supplemental_page_table {
+        	struct hash sup_hash;
+        };
 /* The function table for page operations.
  * This is one way of implementing "interface" in C.
  * Put the table of "method" into the struct's member, and
@@ -81,11 +79,10 @@ struct page_operations {
 /* Representation of current process's memory space.
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
-   struct supplemental_page_table {
-        	struct hash sup_hash;
-        };
+
 
 #include "threads/thread.h"
+
 void supplemental_page_table_init (struct supplemental_page_table *spt);
 bool supplemental_page_table_copy (struct supplemental_page_table *dst,
 		struct supplemental_page_table *src);
@@ -106,7 +103,6 @@ bool vm_alloc_page_with_initializer (enum vm_type type, void *upage,
 void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
-void supplemental_page_table_init (struct supplemental_page_table *sup);
 
 
 #endif  /* VM_VM_H */
