@@ -30,13 +30,6 @@ enum vm_type {
 #ifdef EFILESYS
 #include "filesys/page_cache.h"
 #endif
-
-struct page_operations {
-  bool (*swap_in) (struct page *, void *);
-  bool (*swap_out) (struct page *);
-  void (*destroy) (struct page *);
-  enum vm_type type;
-};
 struct thread;
 
 #define VM_TYPE(type) ((type) & 7)
