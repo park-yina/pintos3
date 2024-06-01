@@ -44,7 +44,7 @@ struct page {
 	const struct page_operations *operations;
 	void *va;              /* Address in terms of user space */
 	struct frame *frame;   /* Back reference for frame */
-
+	struct hash_elem hash_elem; //작성하다보니 멤버 변수 필요
 	/* Your implementation */
 
 	/* Per-type data are binded into the union.
