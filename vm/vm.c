@@ -51,22 +51,6 @@ page_get_type (struct page *page) {
 // 	} else
 // 		return false;
 // }
-unsigned page_hash(const struct hash_elem *p_, void *aux UNUSED) {
-    const struct page *p = hash_entry(p_, struct page, hash_elem);
-    return hash_bytes(&p->va, sizeof p->va);
-}
-
-// 해시 테이블 초기화할 때 해시 요소들 비교하는 함수의 포인터
-// a가 b보다 작으면 true, 반대면 false
-bool page_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED) {
-    const struct page *a = hash_entry(a_, struct page, hash_elem);
-    const struct page *b = hash_entry(b_, struct page, hash_elem);
-
-    return a->va < b->va;
-}
-void supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
-	hash_init(&spt->sup_hash, page_hash, page_less, NULL);
-}
 /* Helpers */
 static struct frame *vm_get_victim (void);
 static bool vm_do_claim_page (struct page *page);
