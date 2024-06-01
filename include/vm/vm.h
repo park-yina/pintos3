@@ -58,9 +58,6 @@ struct page {
 #endif
 	};
 };
-struct supplemental_page_table {
-    struct hash spt_hash;
- };
 /* The representation of "frame" */
 struct frame {
 	void *kva;
