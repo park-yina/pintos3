@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
 #include "threads/interrupt.h"
 #ifdef VM
 #include "vm/vm.h"
@@ -30,6 +31,8 @@ typedef int tid_t;
 #define NICE_DEFAULT 0
 #define RECENT_CPU_DEFAULT 0
 #define LOAD_AVG_DEFAULT 0
+#define FDT_PAGES 3
+#define FDT_COUNT_LIMIT 130 // limit fdidx
 
 /* A kernel thread or user process.
  *
@@ -109,7 +112,22 @@ struct thread {
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
-	
+
+	int exit_status;
+
+	struct file **file_descriptor_table;
+	int fdidx;
+
+	struct list child_list;
+	struct list_elem child_list_elem;
+	struct intr_frame parent_frame;
+
+	struct semaphore child_sema;
+	struct semaphore exit_sema; 
+	struct semaphore wait_sema;
+
+	struct file *running;
+
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

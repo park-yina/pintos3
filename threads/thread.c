@@ -144,6 +144,7 @@ thread_init (void) {
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid (); // 고유 tid를 할당
 	initial_thread->wakeup_tick = 0;
+
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -210,18 +211,27 @@ thread_create (const char *name, int priority,
 		thread_func *function, void *aux) {
 	struct thread *t;
 	tid_t tid;
-
 	ASSERT (function != NULL); // 함수 포인터가 유효한지
 
 	/* Allocate thread. */
 	t = palloc_get_page (PAL_ZERO); // 페이지 할당자를 통해 메모리를 할당하고 할당된 메모리를 0으로
 	if (t == NULL)
 		return TID_ERROR;
-
+	
+     
 	/* Initialize thread. */
 	init_thread (t, name, priority);
 	tid = t->tid = allocate_tid ();
 
+	t->file_descriptor_table = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
+
+	if (t->file_descriptor_table == NULL) {
+		return TID_ERROR;
+	}
+
+	t->fdidx = 2; // 0은 stdin, 1은 stdout에 이미 할당
+	t->file_descriptor_table[0] = 1; // stdin 자리(1)
+	t->file_descriptor_table[1] = 2; // stdout 자리(2)
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
 	/* 쓰레드의 컨텍스트(상태)를 설정*/
@@ -233,6 +243,7 @@ thread_create (const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+	list_push_back(&thread_current()->child_list, &t->child_list_elem);
 
 	thread_unblock (t);
 	if(name != "idle")
@@ -477,7 +488,14 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->nice = NICE_DEFAULT;
   	t->recent_cpu = RECENT_CPU_DEFAULT;
 	list_init(&t->donation);
+	list_init(&t->child_list);
 	t->magic = THREAD_MAGIC;
+	t->exit_status = 0;
+	t->running = NULL;
+
+	sema_init (&t->child_sema, 0);
+	sema_init (&t->exit_sema, 0);
+	sema_init (&t->wait_sema, 0);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
