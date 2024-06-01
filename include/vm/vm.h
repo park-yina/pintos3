@@ -31,7 +31,12 @@ enum vm_type {
 #include "filesys/page_cache.h"
 #endif
 
-struct page_operations;
+struct page_operations {
+  bool (*swap_in) (struct page *, void *);
+  bool (*swap_out) (struct page *);
+  void (*destroy) (struct page *);
+  enum vm_type type;
+};
 struct thread;
 
 #define VM_TYPE(type) ((type) & 7)
@@ -44,7 +49,7 @@ struct page {
 	const struct page_operations *operations;
 	void *va;              /* Address in terms of user space */
 	struct frame *frame;   /* Back reference for frame */
-	struct hash_elem hash_elem; //작성하다보니 멤버 변수 필요
+	struct hash_elem list_elem; //작성하다보니 멤버 변수 필요
 	/* Your implementation */
 
 	/* Per-type data are binded into the union.
