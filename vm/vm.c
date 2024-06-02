@@ -59,19 +59,29 @@ static struct frame *vm_evict_frame (void);
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
  * `vm_alloc_page`. */
-struct page *spt_find_page(struct supplemental_page_table *h, void *va) {
+/* Find VA from spt and return page. On error, return NULL. */
+struct page *spt_find_page(struct supplemental_page_table *h UNUSED, void *va UNUSED) {
+    struct page *page = NULL;
+    /* TODO: Fill this function. */
+
+    // 페이지 테이블에서 검색할 때 사용할 더미 페이지 생성
     struct page dummy_page;
+    dummy_page.va = pg_round_down(va);  // 주어진 가상 주소를 페이지 경계로 내림
+
     struct hash_elem *e;
 
-    dummy_page.va = pg_round_down(va);
+    // 해시 테이블에서 더미 페이지의 해시 요소를 사용해 페이지 검색
     e = hash_find(&h->spt_hash, &dummy_page.hash_elem);
 
+    // 페이지를 찾지 못하면 NULL 반환
     if (e == NULL) {
         return NULL;
     }
 
-    return hash_entry(e, struct page, hash_elem);
+    // 찾은 해시 요소를 페이지 구조체로 변환하여 반환
+    return page = hash_entry(e, struct page, hash_elem);
 }
+
 bool vm_alloc_page_with_initializer(enum vm_type type, void *upage, bool writable,
                                     vm_initializer *init, void *aux)
 {
