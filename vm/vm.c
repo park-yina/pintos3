@@ -59,33 +59,58 @@ static struct frame *vm_evict_frame (void);
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
  * `vm_alloc_page`. */
-bool
-vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
-		vm_initializer *init, void *aux) {
+struct page *spt_find_page(struct supplemental_page_table *h, void *va) {
+    struct page dummy_page;
+    struct hash_elem *e;
 
-	ASSERT (VM_TYPE(type) != VM_UNINIT)
+    dummy_page.va = pg_round_down(va);
+    e = hash_find(&h->spt_hash, &dummy_page.hash_elem);
 
-	struct supplemental_page_table *spt = &thread_current ()->spt;
+    if (e == NULL) {
+        return NULL;
+    }
 
-	/* Check wheter the upage is already occupied or not. */
-	if (spt_find_page (spt, upage) == NULL) {
-		/* TODO: Create the page, fetch the initialier according to the VM type,
-		 * TODO: and then create "uninit" page struct by calling uninit_new. You
-		 * TODO: should modify the field after calling the uninit_new. */
+    return hash_entry(e, struct page, hash_elem);
+}
+bool vm_alloc_page_with_initializer(enum vm_type type, void *upage, bool writable,
+                                    vm_initializer *init, void *aux)
+{
+    ASSERT(VM_TYPE(type) != VM_UNINIT)
 
-		/* TODO: Insert the page into the spt. */
-	}
+    struct supplemental_page_table *spt = &thread_current()->spt;
+
+    /* Check wheter the upage is already occupied or not. */
+    // upage가 이미 사용 중인지 확인합니다.
+    if (spt_find_page(spt, upage) == NULL)
+    {
+        /* TODO: Create the page, fetch the initialier according to the VM type,
+         * TODO: and then create "uninit" page struct by calling uninit_new. You
+         * TODO: should modify the field after calling the uninit_new. */
+         
+       struct page *p = (struct page *)malloc(sizeof(struct page));
+        
+        bool (*page_initializer)(struct page *, enum vm_type, void *);
+
+        switch (VM_TYPE(type))
+        {
+        case VM_ANON:
+            page_initializer = anon_initializer;
+            break;
+        case VM_FILE:
+            page_initializer = file_backed_initializer;
+            break;
+        }
+
+        uninit_new(p, upage, init, type, aux, page_initializer);
+
+        p->writable = writable;
+
+        return spt_insert_page(spt, p);
+    }
 err:
-	return false;
+    return false;
 }
 /* Find VA from spt and return page. On error, return NULL. */
-struct page *
-spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
-	struct page *page = NULL;
-	/* TODO: Fill this function. */
-
-	return page;
-}
 
 /* Insert PAGE into spt with validation. */
 bool
