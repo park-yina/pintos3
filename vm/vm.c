@@ -6,6 +6,7 @@
 #include "vm/uninit.h"
 #include "vm/anon.h"
 #include "vm/file.h"
+#include "threads/vaddr.h"
 #include "lib/kernel/hash.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
