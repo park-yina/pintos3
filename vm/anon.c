@@ -2,7 +2,8 @@
 
 #include "vm/vm.h"
 #include "devices/disk.h"
-
+struct bitmap *swap_table;
+const size_t SECTORS_PER_PAGE = PGSIZE / DISK_SECTOR_SIZE;
 /* DO NOT MODIFY BELOW LINE */
 static struct disk *swap_disk;
 static bool anon_swap_in (struct page *page, void *kva);
@@ -20,18 +21,23 @@ static const struct page_operations anon_ops = {
 /* Initialize the data for anonymous pages */
 void
 vm_anon_init (void) {
-	swap_disk=disk_get(1,1);//swap은 구조체를 보면 11임
-	/* TODO: Set up the swap_disk. */
-	swap_disk = NULL;
+	swap_disk = disk_get(1, 1);
+    size_t swap_size = disk_size(swap_disk) / SECTORS_PER_PAGE;
+    swap_table = bitmap_create(swap_size);
 }
 
 /* Initialize the file mapping */
 bool
 anon_initializer (struct page *page, enum vm_type type, void *kva) {
 	/* Set up the handler */
+	//일단은 ANON PAGE를 0으로 MEMSET부터 시켜주는
+	struct uninit_page *uninit_p = &page->uninit;
+	memset(uninit_p,0,sizeof(struct uninit_page));
 	page->operations = &anon_ops;
-
 	struct anon_page *anon_page = &page->anon;
+	anon_page->swap_index = -1;
+
+	return true;
 }
 
 /* Swap in the page by read contents from the swap disk. */
