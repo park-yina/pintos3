@@ -20,6 +20,7 @@ static const struct page_operations anon_ops = {
 /* Initialize the data for anonymous pages */
 void
 vm_anon_init (void) {
+	swap_disk=disk_get(1,1);//swap은 구조체를 보면 11임
 	/* TODO: Set up the swap_disk. */
 	swap_disk = NULL;
 }

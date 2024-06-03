@@ -106,6 +106,7 @@ struct thread {
 	int recent_cpu;
 	struct list_elem d_elem;
 	struct list_elem a_elem;
+	uint64_t *pml4;
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */

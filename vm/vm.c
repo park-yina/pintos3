@@ -124,13 +124,12 @@ err:
 /* Find VA from spt and return page. On error, return NULL. */
 
 /* Insert PAGE into spt with validation. */
-bool
-spt_insert_page (struct supplemental_page_table *spt UNUSED,
-		struct page *page UNUSED) {
-	int succ = false;
-	/* TODO: Fill this function. */
-
-	return succ;
+/* Insert PAGE into spt with validation. */
+bool spt_insert_page(struct supplemental_page_table *spt,
+                     struct page *page)
+{
+    /* TODO: Fill this function. */
+    return hash_insert(&spt, &page->hash_elem) == NULL ? true : false; // 존재하지 않을 경우에만 삽입
 }
 
 void
@@ -164,11 +163,20 @@ vm_evict_frame (void) {
  * space.*/
 static struct frame *
 vm_get_frame (void) {
-	struct frame *frame = NULL;
+	struct frame *frame = malloc(sizeof(struct frame));
+	//할당을 위해서는 우선 크기/malloc을 해주어서 할당을 위한 세팅을 해야한다
+	frame -> kva = palloc_get_page (PAL_USER);
+	frame->page=NULL;
 	/* TODO: Fill this function. */
 
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
+	if(frame->kva==NULL){
+		//--> vm_evict_frame() -> vm_get_victim() -> swap_out() -> return victim
+		free(frame);
+		vm_evict_frame();
+	}
+	ASSERT(frame->kva==NULL);
 	return frame;
 }
 
@@ -214,14 +222,18 @@ vm_claim_page (void *va UNUSED) {
 /* Claim the PAGE and set up the mmu. */
 static bool
 vm_do_claim_page (struct page *page) {
-	struct frame *frame = vm_get_frame ();
+	/*1) vm_get_frame() 통해 frame 생성
+	2) frame <-> page 연결*/
+	struct thread *cur=thread_current();
 
+	struct frame *frame = vm_get_frame ();
+	ASSERT(frame!=NULL);
+	ASSERT(cur!=NULL);
 	/* Set links */
+
 	frame->page = page;
 	page->frame = frame;
-
-	/* TODO: Insert page table entry to map page's VA to frame's PA. */
-
+	pml4_set_page(cur->pml4, page->va, frame->kva, page->writable);
 	return swap_in (page, frame->kva);
 }
 
