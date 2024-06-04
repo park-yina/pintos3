@@ -476,4 +476,3 @@ void reset_priority(void){
 		}
 	}
 }
-/* ------------------- project 1 functions end ------------------------------- */

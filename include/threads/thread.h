@@ -49,6 +49,7 @@ struct thread {
 	struct lock *wait_on_lock; /* which lock thread is waiting for  */
 	struct list donation_list; /* list of threads that donate priority to **this thread** */
 	struct list_elem donation_elem; /* prev and next pointer of donation_list where **this thread donate** */
+    struct list donations;			/* 자신에게 priority 를 나누어준 스레드들의 리스트 */
 
 	int exit_status;	 	/* to give child exit_status to parent */
 	int fd_idx;                     /* for open file's fd in fd_table */
