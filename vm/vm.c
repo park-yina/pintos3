@@ -359,7 +359,7 @@ vm_do_claim_page (struct page *page) {
 // 		return false;
 // }
 unsigned page_hash(const struct hash_elem *h1,void *aux){
-	const struct page page *p2=hash_entry(p2, struct page, hash_elem);
+	const struct page *p2=hash_entry(p2, struct page, hash_elem);
 	return hash_bytes(&p2->va,sizeof(p2->va));
 	//바이트를 구해오기 위해 p2->va의 사이즈를 같이 인자로
 }
