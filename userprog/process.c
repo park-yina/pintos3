@@ -425,46 +425,55 @@ done:
 
 /* Checks whether PHDR describes a valid, loadable segment in
  * FILE and returns true if so, false otherwise. */
-bool
-validate_segment (const struct Phdr *phdr, struct file *file) {
-	/* p_offset and p_vaddr must have the same page offset. */
-	if ((phdr->p_offset & PGMASK) != (phdr->p_vaddr & PGMASK))
-		return false;
+struct Phdr {
+    uint32_t p_type;
+    off_t p_offset;
+    void *p_vaddr;
+    uint32_t p_flags;
+    uint32_t p_filesz;
+    uint32_t p_memsz;
+    uint32_t p_align;
+};
 
-	/* p_offset must point within FILE. */
-	if (phdr->p_offset > (uint64_t) file_length (file))
-		return false;
+bool validate_segment(const struct Phdr *phdr, struct file *file) {
+    /* p_offset and p_vaddr must have the same page offset. */
+    if ((phdr->p_offset & PGMASK) != (phdr->p_vaddr & PGMASK))
+        return false;
 
-	/* p_memsz must be at least as big as p_filesz. */
-	if (phdr->p_memsz < phdr->p_filesz)
-		return false;
+    /* p_offset must point within FILE. */
+    if (phdr->p_offset > (uint64_t) file_length(file))
+        return false;
 
-	/* The segment must not be empty. */
-	if (phdr->p_memsz == 0)
-		return false;
+    /* p_memsz must be at least as big as p_filesz. */
+    if (phdr->p_memsz < phdr->p_filesz)
+        return false;
 
-	/* The virtual memory region must both start and end within the
-	   user address space range. */
-	if (!is_user_vaddr ((void *) phdr->p_vaddr))
-		return false;
-	if (!is_user_vaddr ((void *) (phdr->p_vaddr + phdr->p_memsz)))
-		return false;
+    /* The segment must not be empty. */
+    if (phdr->p_memsz == 0)
+        return false;
 
-	/* The region cannot "wrap around" across the kernel virtual
-	   address space. */
-	if (phdr->p_vaddr + phdr->p_memsz < phdr->p_vaddr)
-		return false;
+    /* The virtual memory region must both start and end within the
+       user address space range. */
+    if (!is_user_vaddr((void *)phdr->p_vaddr))
+        return false;
+    if (!is_user_vaddr((void *)(phdr->p_vaddr + phdr->p_memsz)))
+        return false;
 
-	/* Disallow mapping page 0.
-	   Not only is it a bad idea to map page 0, but if we allowed
-	   it then user code that passed a null pointer to system calls
-	   could quite likely panic the kernel by way of null pointer
-	   assertions in memcpy(), etc. */
-	if (phdr->p_vaddr < PGSIZE)
-		return false;
+    /* The region cannot "wrap around" across the kernel virtual
+       address space. */
+    if (phdr->p_vaddr + phdr->p_memsz < phdr->p_vaddr)
+        return false;
 
-	/* It's okay. */
-	return true;
+    /* Disallow mapping page 0.
+       Not only is it a bad idea to map page 0, but if we allowed
+       it then user code that passed a null pointer to system calls
+       could quite likely panic the kernel by way of null pointer
+       assertions in memcpy(), etc. */
+    if (phdr->p_vaddr < PGSIZE)
+        return false;
+
+    /* It's okay. */
+    return true;
 }
 
 #ifndef VM
