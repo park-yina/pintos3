@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 #include "hash.h"
+#include "threads/synch.h"
 struct list frame_table;
 enum vm_type {
 	/* page not initialized */
