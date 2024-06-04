@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
 #include "threads/interrupt.h"
 #include "filesys/file.h"  /* P2_3 System Call 추가 */
 #ifdef VM
@@ -48,20 +49,17 @@ struct thread {
     /* ----- PROJECT 1 --------- */
     int64_t wake_up_tick; /* thread's wakeup_time */
     int initial_priority; /* thread's initial priority */
-    struct lock *wait_on_lock; /* which lock thread is waiting for  */
     struct list donation_list; /* list of threads that donate priority to **this thread** */
     struct list_elem donation_elem; /* prev and next pointer of donation_list where **this thread donate** */
     /* ------------------------- */
 
     int exit_status;         /* to give child exit_status to parent */
-    int fd_idx;                     /* for open file's fd in fd_table */
     struct intr_frame parent_if;    /* Information of parent's frame */
     struct list child_list; /* list of threads that are made by this thread */
     struct list_elem child_elem; /* elem for this thread's parent's child_list */
     struct semaphore fork_sema; /* parent thread should wait while child thread copy parent */
     struct semaphore wait_sema;
     struct semaphore free_sema;
-    struct file **fd_table;   /* allocated in thread_create */  
     struct file *running;
     
 #ifdef USERPROG
@@ -88,7 +86,6 @@ struct thread {
     int init_priority; /* 스레드가 priority 를 양도받았다가 다시 반납할 때 원래의 priority 를 복원할 수 있도록 고유의 priority 값을 저장하는 변수 */
     struct lock *wait_on_lock;        /* 스레드가 현재 얻기 위해 기다리고 있는 lock 으로 스레드는 이 lock 이 release 되기를 기다린다 */
     struct list donations;            /* 자신에게 priority 를 나누어준 스레드들의 리스트 */
-    struct list_elem donation_elem;    /* 이 리스트를 관리하기 위한 element 로 thread 구조체의 그냥 elem 과 구분하여 사용한다 */
     /* P2_3 System Call 추가 */
     struct file **fd_table;
     int fd_idx;
