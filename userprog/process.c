@@ -579,6 +579,7 @@ setup_stack (struct intr_frame *if_) {
     			&& pml4_set_page (t->pml4, upage, kpage, writable));
     }
 #else
+#endif 
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
         uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
