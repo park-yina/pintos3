@@ -45,12 +45,15 @@ uninit_new (struct page *page, void *va, vm_initializer *init,
 /* Initalize the page on first fault */
 static bool
 uninit_initialize (struct page *page, void *kva) {
-	struct uninit_page *uninit = &page->uninit;
-	/* Fetch first, page_initialize may overwrite the values */
-	vm_initializer *init = uninit->init;
-	void *aux = uninit->aux;
-	return uninit->page_initializer (page, uninit->type, kva) && (init ? init (page, aux) : true);
-}
+    	struct uninit_page *uninit = &page->uninit;
+    
+    	/* Fetch first, page_initialize may overwrite the values */
+    	vm_initializer *init = uninit->init;
+    	void *aux = uninit->aux;
+    
+    	/* TODO: You may need to fix this function. */
+    	return uninit->page_initializer (page, uninit->type, kva) && (init ? init (page, aux) : true);
+ }
 /* Free the resources hold by uninit_page. Although most of pages are transmuted
  * to other page objects, it is possible to have uninit pages when the process
  * exit, which are never referenced during the execution.
@@ -61,3 +64,19 @@ uninit_destroy (struct page *page) {
 	/* TODO: Fill this function.
 	 * TODO: If you don't have anything to do, just return. */
 }
+        void uninit_new (struct page *page, void *va, vm_initializer *init, enum vm_type type, void *aux,
+        		bool (*initializer)(struct page *, enum vm_type, void *)) {
+        	ASSERT (page != NULL);
+        
+        	*page = (struct page) {
+        		.operations = &uninit_ops,
+        		.va = va,
+        		.frame = NULL, /* no frame for now */
+        		.uninit = (struct uninit_page) {
+        			.init = init,
+        			.type = type,
+        			.aux = aux,
+        			.page_initializer = initializer,
+        		}
+        	};
+        }

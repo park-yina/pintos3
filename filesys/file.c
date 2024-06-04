@@ -69,12 +69,11 @@ file_get_inode (struct file *file) {
  * Returns the number of bytes actually read,
  * which may be less than SIZE if end of file is reached.
  * Advances FILE's position by the number of bytes read. */
-off_t
-file_read (struct file *file, void *buffer, off_t size) {
-	off_t bytes_read = inode_read_at (file->inode, buffer, size, file->pos);
-	file->pos += bytes_read;
-	return bytes_read;
-}
+    off_t file_read (struct file *file, void *buffer, off_t size) {
+    	off_t bytes_read = inode_read_at (file->inode, buffer, size, file->pos);
+    	file->pos += bytes_read;
+    	return bytes_read;
+    }
 
 /* Reads SIZE bytes from FILE into BUFFER,
  * starting at offset FILE_OFS in the file.
@@ -145,12 +144,11 @@ file_length (struct file *file) {
 
 /* Sets the current position in FILE to NEW_POS bytes from the
  * start of the file. */
-void
-file_seek (struct file *file, off_t new_pos) {
-	ASSERT (file != NULL);
-	ASSERT (new_pos >= 0);
-	file->pos = new_pos;
-}
+    void file_seek (struct file *file, off_t new_pos) {
+    	ASSERT (file != NULL);
+    	ASSERT (new_pos >= 0);
+    	file->pos = new_pos;
+    }
 
 /* Returns the current position in FILE as a byte offset from the
  * start of the file. */

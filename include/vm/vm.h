@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 #include "hash.h"
+struct list frame_table;
 enum vm_type {
 	/* page not initialized */
 	VM_UNINIT = 0,
@@ -38,32 +39,39 @@ struct thread;
  * This is kind of "parent class", which has four "child class"es, which are
  * uninit_page, file_page, anon_page, and page cache (project4).
  * DO NOT REMOVE/MODIFY PREDEFINED MEMBER OF THIS STRUCTURE. */
-struct page
-{
+         struct lazy_load_info {
+        	struct file *file;
+        	size_t page_read_bytes;
+        	size_t page_zero_bytes;
+        	off_t offset;
+        };
+struct page {
     const struct page_operations *operations;
-    void *va;             /* Address in terms of user space */
-    struct frame *frame; /* Back reference for frame */
-
-    /* Your implementation */
-    struct hash_elem hash_elem;
-	struct list_elem list_elem;
-	bool writable;
-    /* Per-type data are binded into the union.
-     * Each function automatically detects the current union */
-    union
-    {
-        struct uninit_page uninit;
-        struct anon_page anon;
-        struct file_page file;
-#ifdef EFILESYS
-        struct page_cache page_cache;
-#endif
-    };
+    	void *va;              /* Address in terms of user space */
+    	struct frame *frame;   /* Back reference for frame */
+    
+    	/* Your implementation */
+    	/* P3 추가 */
+    	struct hash_elem hash_elem; /* Hash table element for SPT */
+    	bool writable;
+    	int page_cnt; // only for file-mapped pages
+    
+    	/* Per-type data are binded into the union.
+    	 * Each function automatically detects the current union */
+    	union {
+    		struct uninit_page uninit;
+    		struct anon_page anon;
+    		struct file_page file;
+    #ifdef EFILESYS
+    		struct page_cache page_cache;
+    #endif
+    	};
 };
 /* The representation of "frame" */
 struct frame {
-	void *kva;
-	struct page *page;
+  void *kva; /* kernel virtual address */
+  struct page *page; 
+	struct list_elem elem;  // 추가
 };
 struct supplemental_page_table
 {

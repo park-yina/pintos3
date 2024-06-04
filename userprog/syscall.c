@@ -23,7 +23,13 @@ void syscall_handler (struct intr_frame *);
 #define MSR_STAR 0xc0000081         /* Segment selector msr */
 #define MSR_LSTAR 0xc0000082        /* Long mode SYSCALL target */
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
-
+    void check_address(const uint64_t *uaddr) {
+    struct thread *curr = thread_current();
+    	// if (user_addr = NULL || !(is_user_vaddr(user_addr)) || pml4_get_page(curr->pml4, user_addr) == NULL) {
+    	if (uaddr == NULL || !(is_user_vaddr(uaddr))) { /* P3 수정 */
+    		exit(-1);
+    	}
+    }
 void
 syscall_init (void) {
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |

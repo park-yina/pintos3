@@ -106,18 +106,23 @@ struct thread {
 	int recent_cpu;
 	struct list_elem d_elem;
 	struct list_elem a_elem;
+	struct hash spt;
+	uintptr_t rsp; // 추가
+
 
 	/* Shared between thread.c and synch.c. */
-	struct list_elem elem;              /* List element. */
-	
+	struct list_elem elem;              /* List element. *
+	uint64_t *pml4;                     /* Page map level 4 */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
 #endif
 #ifdef VM
-	/* Table for whole virtual memory owned by thread. */
-	struct supplemental_page_table spt;
+    /* Table for whole virtual memory owned by thread. */
+    struct supplemental_page_table spt;
+    void *stack_bottom;
+    void *rsp_stack;
 #endif
 
 	/* Owned by thread.c. */
