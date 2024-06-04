@@ -425,17 +425,8 @@ done:
 
 /* Checks whether PHDR describes a valid, loadable segment in
  * FILE and returns true if so, false otherwise. */
-struct Phdr {
-    uint32_t p_type;
-    off_t p_offset;
-    void *p_vaddr;
-    uint32_t p_flags;
-    uint32_t p_filesz;
-    uint32_t p_memsz;
-    uint32_t p_align;
-};
 
-bool validate_segment(const struct Phdr *phdr, struct file *file) {
+static bool validate_segment(const struct Phdr *phdr, struct file *file) {
     /* p_offset and p_vaddr must have the same page offset. */
     if ((phdr->p_offset & PGMASK) != (phdr->p_vaddr & PGMASK))
         return false;
