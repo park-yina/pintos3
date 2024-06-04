@@ -76,6 +76,8 @@ struct frame {
 struct supplemental_page_table
 {
 	struct hash spt_hash;
+	    struct hash pages; // 새로운 pages 해시 테이블 추가
+
 };
 
 /* The function table for page operations.
