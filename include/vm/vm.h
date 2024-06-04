@@ -53,6 +53,7 @@ struct page {
     	/* Your implementation */
     	/* P3 추가 */
     	struct hash_elem hash_elem; /* Hash table element for SPT */
+		struct list_elem list_elem;
     	bool writable;
     	int page_cnt; // only for file-mapped pages
     
