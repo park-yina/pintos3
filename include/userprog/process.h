@@ -8,7 +8,6 @@ tid_t process_fork (const char *name, struct intr_frame *if_);
 int process_exec (void *f_name);
 int process_wait (tid_t);
 void process_exit (void);
-bool lazy_load_segment (struct page *page, void *aux) 
 void process_activate (struct thread *next);
 struct container{
     struct file *file;
