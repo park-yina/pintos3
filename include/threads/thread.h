@@ -114,7 +114,6 @@ void thread_unblock (struct thread *);
 struct thread *thread_current (void);
 tid_t thread_tid (void);
 const char *thread_name (void);
-
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
 
@@ -140,4 +139,3 @@ bool thread_donate_priority_compare (struct list_elem *element1, struct list_ele
 struct thread* get_child_by_tid(tid_t tid);
 /* -------------------------------------------------- */
 #endif /* threads/thread.h */
-ㄴ
