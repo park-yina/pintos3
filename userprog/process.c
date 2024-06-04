@@ -310,123 +310,7 @@ struct ELF64_PHDR {
 };
 
 /* Abbreviations */
-#define ELF ELF64_hdr
-#define Phdr ELF64_PHDR
-
-/* Loads an ELF executable from FILE_NAME into the current thread.
- * Stores the executable's entry point into *RIP
- * and its initial stack pointer into *RSP.
- * Returns true if successful, false otherwise. */
-static bool
-load (const char *file_name, struct intr_frame *if_) {
-	struct thread *t = thread_current ();
-	struct ELF ehdr;
-	struct file *file = NULL;
-	off_t file_ofs;
-	bool success = false;
-	int i;
-
-	/* Allocate and activate page directory. */
-	t->pml4 = pml4_create ();
-	if (t->pml4 == NULL)
-		goto done;
-	process_activate (thread_current ());
-
-	/* Open executable file. */
-	file = filesys_open (file_name);
-	if (file == NULL) {
-		printf ("load: %s: open failed\n", file_name);
-		goto done;
-	}
-
-	/* Read and verify executable header. */
-	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
-			|| memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)
-			|| ehdr.e_type != 2
-			|| ehdr.e_machine != 0x3E // amd64
-			|| ehdr.e_version != 1
-			|| ehdr.e_phentsize != sizeof (struct Phdr)
-			|| ehdr.e_phnum > 1024) {
-		printf ("load: %s: error loading executable\n", file_name);
-		goto done;
-	}
-
-	/* Read program headers. */
-	file_ofs = ehdr.e_phoff;
-	for (i = 0; i < ehdr.e_phnum; i++) {
-		struct Phdr phdr;
-
-		if (file_ofs < 0 || file_ofs > file_length (file))
-			goto done;
-		file_seek (file, file_ofs);
-
-		if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
-			goto done;
-		file_ofs += sizeof phdr;
-		switch (phdr.p_type) {
-			case PT_NULL:
-			case PT_NOTE:
-			case PT_PHDR:
-			case PT_STACK:
-			default:
-				/* Ignore this segment. */
-				break;
-			case PT_DYNAMIC:
-			case PT_INTERP:
-			case PT_SHLIB:
-				goto done;
-			case PT_LOAD:
-				if (validate_segment (&phdr, file)) {
-					bool writable = (phdr.p_flags & PF_W) != 0;
-					uint64_t file_page = phdr.p_offset & ~PGMASK;
-					uint64_t mem_page = phdr.p_vaddr & ~PGMASK;
-					uint64_t page_offset = phdr.p_vaddr & PGMASK;
-					uint32_t read_bytes, zero_bytes;
-					if (phdr.p_filesz > 0) {
-						/* Normal segment.
-						 * Read initial part from disk and zero the rest. */
-						read_bytes = page_offset + phdr.p_filesz;
-						zero_bytes = (ROUND_UP (page_offset + phdr.p_memsz, PGSIZE)
-								- read_bytes);
-					} else {
-						/* Entirely zero.
-						 * Don't read anything from disk. */
-						read_bytes = 0;
-						zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
-					}
-					if (!load_segment (file, file_page, (void *) mem_page,
-								read_bytes, zero_bytes, writable))
-						goto done;
-				}
-				else
-					goto done;
-				break;
-		}
-	}
-
-	/* Set up stack. */
-	if (!setup_stack (if_))
-		goto done;
-
-	/* Start address. */
-	if_->rip = ehdr.e_entry;
-
-	/* TODO: Your code goes here.
-	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-
-	success = true;
-
-done:
-	/* We arrive here whether the load is successful or not. */
-	file_close (file);
-	return success;
-}
-
-
-/* Checks whether PHDR describes a valid, loadable segment in
- * FILE and returns true if so, false otherwise. */
-
-static bool validate_segment(struct Phdr *phdr, struct file *file) {
+bool validate_segment(const struct Phdr *phdr, struct file *file) {
     /* p_offset and p_vaddr must have the same page offset. */
     if ((phdr->p_offset & PGMASK) != (phdr->p_vaddr & PGMASK))
         return false;
@@ -443,23 +327,17 @@ static bool validate_segment(struct Phdr *phdr, struct file *file) {
     if (phdr->p_memsz == 0)
         return false;
 
-    /* The virtual memory region must both start and end within the
-       user address space range. */
+    /* The virtual memory region must both start and end within the user address space range. */
     if (!is_user_vaddr((void *)phdr->p_vaddr))
         return false;
     if (!is_user_vaddr((void *)(phdr->p_vaddr + phdr->p_memsz)))
         return false;
 
-    /* The region cannot "wrap around" across the kernel virtual
-       address space. */
+    /* The region cannot "wrap around" across the kernel virtual address space. */
     if (phdr->p_vaddr + phdr->p_memsz < phdr->p_vaddr)
         return false;
 
-    /* Disallow mapping page 0.
-       Not only is it a bad idea to map page 0, but if we allowed
-       it then user code that passed a null pointer to system calls
-       could quite likely panic the kernel by way of null pointer
-       assertions in memcpy(), etc. */
+    /* Disallow mapping page 0. */
     if (phdr->p_vaddr < PGSIZE)
         return false;
 
@@ -467,61 +345,133 @@ static bool validate_segment(struct Phdr *phdr, struct file *file) {
     return true;
 }
 
-#ifndef VM
-/* Codes of this block will be ONLY USED DURING project 2.
- * If you want to implement the function for whole project 2, implement it
- * outside of #ifndef macro. */
+static bool
+load (const char *file_name, struct intr_frame *if_) {
+    struct thread *t = thread_current();
+    struct ELF ehdr;
+    struct file *file = NULL;
+    off_t file_ofs;
+    bool success = false;
+    int i;
+
+    /* Allocate and activate page directory. */
+    t->pml4 = pml4_create();
+    if (t->pml4 == NULL)
+        goto done;
+    process_activate(thread_current());
+
+    /* Open executable file. */
+    file = filesys_open(file_name);
+    if (file == NULL) {
+        printf("load: %s: open failed\n", file_name);
+        goto done;
+    }
+
+    /* Read and verify executable header. */
+    if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr
+            || memcmp(ehdr.e_ident, "\177ELF\2\1\1", 7)
+            || ehdr.e_type != 2
+            || ehdr.e_machine != 0x3E // amd64
+            || ehdr.e_version != 1
+            || ehdr.e_phentsize != sizeof(struct Phdr)
+            || ehdr.e_phnum > 1024) {
+        printf("load: %s: error loading executable\n", file_name);
+        goto done;
+    }
+
+    /* Read program headers. */
+    file_ofs = ehdr.e_phoff;
+    for (i = 0; i < ehdr.e_phnum; i++) {
+        struct Phdr phdr;
+
+        if (file_ofs < 0 || file_ofs > file_length(file))
+            goto done;
+        file_seek(file, file_ofs);
+
+        if (file_read(file, &phdr, sizeof phdr) != sizeof phdr)
+            goto done;
+        file_ofs += sizeof phdr;
+        switch (phdr.p_type) {
+            case PT_NULL:
+            case PT_NOTE:
+            case PT_PHDR:
+            case PT_STACK:
+            default:
+                /* Ignore this segment. */
+                break;
+            case PT_DYNAMIC:
+            case PT_INTERP:
+            case PT_SHLIB:
+                goto done;
+            case PT_LOAD:
+                if (validate_segment(&phdr, file)) {
+                    bool writable = (phdr.p_flags & PF_W) != 0;
+                    uint64_t file_page = phdr.p_offset & ~PGMASK;
+                    uint64_t mem_page = phdr.p_vaddr & ~PGMASK;
+                    uint64_t page_offset = phdr.p_vaddr & PGMASK;
+                    uint32_t read_bytes, zero_bytes;
+                    if (phdr.p_filesz > 0) {
+                        /* Normal segment. Read initial part from disk and zero the rest. */
+                        read_bytes = page_offset + phdr.p_filesz;
+                        zero_bytes = (ROUND_UP(page_offset + phdr.p_memsz, PGSIZE) - read_bytes);
+                    } else {
+                        /* Entirely zero. Don't read anything from disk. */
+                        read_bytes = 0;
+                        zero_bytes = ROUND_UP(page_offset + phdr.p_memsz, PGSIZE);
+                    }
+                    if (!load_segment(file, file_page, (void *) mem_page, read_bytes, zero_bytes, writable))
+                        goto done;
+                } else
+                    goto done;
+                break;
+        }
+    }
+
+    /* Set up stack. */
+    if (!setup_stack(if_))
+        goto done;
+
+    /* Start address. */
+    if_->rip = ehdr.e_entry;
+
+    success = true;
+
+done:
+    /* We arrive here whether the load is successful or not. */
+    file_close(file);
+    return success;
+}
 
 /* load() helpers. */
-static bool install_page (void *upage, void *kpage, bool writable);
-
-/* Loads a segment starting at offset OFS in FILE at address
- * UPAGE.  In total, READ_BYTES + ZERO_BYTES bytes of virtual
- * memory are initialized, as follows:
- *
- * - READ_BYTES bytes at UPAGE must be read from FILE
- * starting at offset OFS.
- *
- * - ZERO_BYTES bytes at UPAGE + READ_BYTES must be zeroed.
- *
- * The pages initialized by this function must be writable by the
- * user process if WRITABLE is true, read-only otherwise.
- *
- * Return true if successful, false if a memory allocation error
- * or disk read error occurs. */
 static bool
-load_segment (struct file *file, off_t ofs, uint8_t *upage,
-		uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
-	ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
-	ASSERT (pg_ofs (upage) == 0);
-	ASSERT (ofs % PGSIZE == 0);
+load_segment(struct file *file, off_t ofs, uint8_t *upage,
+             uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
+    ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
+    ASSERT(pg_ofs(upage) == 0);
+    ASSERT(ofs % PGSIZE == 0);
 
-	while (read_bytes > 0 || zero_bytes > 0) {
-		/* Do calculate how to fill this page.
-		 * We will read PAGE_READ_BYTES bytes from FILE
-		 * and zero the final PAGE_ZERO_BYTES bytes. */
-		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-		size_t page_zero_bytes = PGSIZE - page_read_bytes;
+    while (read_bytes > 0 || zero_bytes > > 0) {
+        size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+        size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		struct segment *seg = calloc(1, sizeof(struct segment));
-		seg->file = file;
-		seg->offset = ofs;
-		seg->page_read_bytes = page_read_bytes;
-		seg->page_zero_bytes = page_zero_bytes;
+        struct segment *seg = calloc(1, sizeof(struct segment));
+        seg->file = file;
+        seg->offset = ofs;
+        seg->page_read_bytes = page_read_bytes;
+        seg->page_zero_bytes = page_zero_bytes;
 
-		void *aux = seg;
-		if (!vm_alloc_page_with_initializer (VM_ANON, upage, writable, lazy_load_segment, aux)){
-			free(seg);
-			return false;
-		}
-		/* Advance. */
-		read_bytes -= page_read_bytes;
-		zero_bytes -= page_zero_bytes;		
-		ofs += page_read_bytes;
-		upage += PGSIZE;
-	}
-	return true;
+        void *aux = seg;
+        if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, lazy_load_segment, aux)) {
+            free(seg);
+            return false;
+        }
+
+        read_bytes -= page_read_bytes;
+        zero_bytes -= page_zero_bytes;
+        ofs += page_read_bytes;
+        upage += PGSIZE;
+    }
+    return true;
 }
 
 struct segment {
