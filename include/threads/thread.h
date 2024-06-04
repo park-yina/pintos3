@@ -106,7 +106,6 @@ struct thread {
 	int recent_cpu;
 	struct list_elem d_elem;
 	struct list_elem a_elem;
-	struct hash spt;
 	uintptr_t rsp; // 추가
 
 

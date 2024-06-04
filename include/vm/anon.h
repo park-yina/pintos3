@@ -15,7 +15,4 @@ int bitcnt;
     struct bitmap *swap_table; // 0 - empty, 1 - filled
     int bitcnt;
     
-    struct anon_page {
-        int swap_sec; // sector where swapped contents are stored /* 추가 */
-    };
 #endif
