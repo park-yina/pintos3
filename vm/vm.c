@@ -369,6 +369,10 @@ supplemental_page_table_copy (struct supplemental_page_table *dst ,
     return true;
 
 }
+void spt_destructor(struct hash_elem *e, void* aux){
+    const struct page *p = hash_entry(e, struct page, hash_elem);
+    free(p);
+}
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt) {
     /* TODO: Destroy all the supplemental_page_table hold by thread and
