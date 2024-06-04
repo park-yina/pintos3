@@ -8,6 +8,12 @@ tid_t process_fork (const char *name, struct intr_frame *if_);
 int process_exec (void *f_name);
 int process_wait (tid_t);
 void process_exit (void);
+bool setup_stack (struct intr_frame *if_);
+bool validate_segment (const struct Phdr *, struct file *);
+bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
+		uint32_t read_bytes, uint32_t zero_bytes,
+		bool writable);
+
 void process_activate (struct thread *next);
 struct container{
     struct file *file;
