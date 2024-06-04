@@ -3,6 +3,7 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+#include "userprog/process.h"
 #include "vm/uninit.h"
 #include "vm/anon.h"
 #include "vm/file.h"
@@ -203,7 +204,7 @@ static struct frame
 	struct frame *victim = NULL;
 	 /* TODO: The policy for eviction is up to you. */
 	/* P3 추가 */
-	victim = list_entry(list_pop_front(&frame_table), struct frame, elem); 
+	victim = list_entry(list_pop_front(&frame_table), struct frame, elem); /
 	return victim;
 }
 /* Evict one page and return the corresponding frame.
@@ -409,11 +410,6 @@ supplemental_page_table_copy (struct supplemental_page_table *dst ,
     return true;
 
 }
-void spt_destructor(struct hash_elem *e, void* aux){
-    const struct page *p = hash_entry(e, struct page, hash_elem);
-    free(p);
-}
-
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt) {
     /* TODO: Destroy all the supplemental_page_table hold by thread and
