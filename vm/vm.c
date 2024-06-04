@@ -203,7 +203,7 @@ static struct frame
 	struct frame *victim = NULL;
 	 /* TODO: The policy for eviction is up to you. */
 	/* P3 추가 */
-	victim = list_entry(list_pop_front(&frame_table), struct frame, elem); /
+	victim = list_entry(list_pop_front(&frame_table), struct frame, elem); 
 	return victim;
 }
 /* Evict one page and return the corresponding frame.
