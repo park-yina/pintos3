@@ -83,7 +83,6 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	return thread_create (name,
 			PRI_DEFAULT, __do_fork, thread_current ());
 }
-
 #ifndef VM
 /* Duplicate the parent's address space by passing this function to the
  * pml4_for_each. This is only for the project 2. */
@@ -116,6 +115,26 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 }
 #endif
 
+ bool
+setup_stack (struct intr_frame *if_) {
+    bool success = false;
+    void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
+
+    /* TODO: Map the stack on stack_bottom and claim the page immediately.
+     * TODO: If success, set the rsp accordingly.
+     * TODO: You should mark the page is stack. */
+    /* TODO: Your code goes here */
+    // project 3
+    if(vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1)){
+        success = vm_claim_page(stack_bottom);
+        if(success){
+            if_->rsp = USER_STACK;
+            thread_current()->stack_bottom = stack_bottom;
+        }
+    }
+
+    return success;
+}
 /* A thread function that copies parent's execution context.
  * Hint) parent->tf does not hold the userland context of the process.
  *       That is, you are required to pass second argument of process_fork to
@@ -482,26 +501,6 @@ struct segment {
     size_t page_zero_bytes;
 };
 /* Create a minimal stack by mapping a zeroed page at the USER_STACK */
-static bool
-setup_stack (struct intr_frame *if_) {
-    bool success = false;
-    void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
-
-    /* TODO: Map the stack on stack_bottom and claim the page immediately.
-     * TODO: If success, set the rsp accordingly.
-     * TODO: You should mark the page is stack. */
-    /* TODO: Your code goes here */
-    // project 3
-    if(vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1)){
-        success = vm_claim_page(stack_bottom);
-        if(success){
-            if_->rsp = USER_STACK;
-            thread_current()->stack_bottom = stack_bottom;
-        }
-    }
-
-    return success;
-}
 /* Adds a mapping from user virtual address UPAGE to kernel
  * virtual address KPAGE to the page table.
  * If WRITABLE is true, the user process may modify the page;
