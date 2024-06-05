@@ -3,6 +3,7 @@
 #include "vm/vm.h"
 #include "devices/disk.h"
 #include "threads/vaddr.h"
+#include "include/lib/kernel/bitmap.h"
 
 struct bitmap *swap_table;
 const size_t SECTORS_PER_PAGE = PGSIZE / DISK_SECTOR_SIZE;
