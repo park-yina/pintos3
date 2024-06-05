@@ -396,7 +396,7 @@ cond_broadcast (struct condition *cond, struct lock *lock) {
   3. get thread priority of first thread of semaphore's waiters 
   compare and return
  */
-static bool sema_priority_compare(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+static bool sema_priority_compare(const struct list_elem *a, const struct list_elem *b, void *aux){
 	struct semaphore_elem *sema_elem_a;
 	struct semaphore_elem *sema_elem_b;
 	struct list *a_waiter;

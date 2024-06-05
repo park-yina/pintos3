@@ -7,18 +7,13 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h" 
-/* ---------- Project 2 ---------- */
-#include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "userprog/process.h"
 #include "kernel/stdio.h"
 #include "threads/palloc.h"
-/* ------------------------------- */
 #include "vm/vm.h"
 #include <list.h>
 #include "threads/vaddr.h"
-
-// P2_3 추가 */ 
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include <list.h>
@@ -30,10 +25,8 @@
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
-// Project2-4 File descriptor
 static struct file *find_file_by_fd(int fd);
 
-/* ---------- Project 2 ---------- */
 struct page *check_address(void * addr);
 void check_valid_buffer(void *buffer, unsigned size, void *rsp, bool to_write);
 
@@ -41,7 +34,7 @@ void halt (void);			/* 구현 완료 */
 void exit (int status);		/* 구현 완료 */
 tid_t fork (const char *thread_name, struct intr_frame *f);
 int exec (const char *cmd_line);
-int wait (tid_t child_tid UNUSED); /* process_wait()으로 대체 필요 */
+int wait (tid_t child_tid); 
 bool create (const char *file, unsigned initial_size); 	/* 구현 완료 */
 bool remove (const char *file);							/* 구현 완료 */
 int open (const char *file);
@@ -91,19 +84,8 @@ syscall_init (void) {
 	/* ------------------------------- */
 }
 
-/* The main system call interface */
-/* 유저 스택에 저장되어 있는 시스템 콜 넘버를 이용해 시스템 콜 핸들러 구현 */
-/* 1. 스택 포인터가 유저 영역인지 확인 /저장된 인자 값이 포인터일 경우 유저 영역의 주소인지 확인
- * 2. 스택에서 시스템 콜 넘버 복사
- * 3. 시스템 콜 넘버에 따른 인자 복사 및 시스템 콜 호출 */
-/* 0 : halt */
-/* 1 : exit */
-/* . . . */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	// TODO: Your implementation goes here.
-	// printf ("system call! rax : %d\n", f->R.rax);
-	// thread_exit ();
 
 	/* ---------- Project 2 ---------- */
 	switch(f->R.rax) {
@@ -466,15 +448,10 @@ close (int fd) {
 	file_close(file_obj);
 }
 
-/* ------------------------------- */
-
-// Project 3-3 mmap
 void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
-	// Fail : map to i/o console, zero length, map at 0, addr not page-aligned
 	if(fd == 0 || fd == 1 || length == 0 || addr == 0 || pg_ofs(addr) != 0 || offset > PGSIZE)
 		return NULL;
 
-	// Find file by fd
 	struct file *file = find_file_by_fd(fd);	
 
 	// Fail : NULL file, file length is zero
@@ -484,7 +461,6 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
 	return do_mmap(addr, length, writable, file, offset);
 }
 
-// Project 3-3 mmap
 void munmap (void *addr){
 	do_munmap(addr);
 }

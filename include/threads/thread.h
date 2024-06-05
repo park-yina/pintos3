@@ -56,11 +56,8 @@ struct thread {
 	struct semaphore wait_sema;
 	struct semaphore free_sema;
 	struct file *running;
-	
-#ifdef USERPROG
-	/* Owned by userprog/process.c. */
+		/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
-#endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
@@ -73,15 +70,11 @@ struct thread {
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
-	/* 이 값은 thread.c에 정의된 임의의 숫자이며, 스택 오버플로를 감지하는데 사용된다. 
-	thread_current()는 실행 중인 스레드 구조체의 magic 멤버가 THREAD_MAGIC으로 설정 되었는지 확인한다. 
-	스택 오버플로로 인해 이 값이 변경되어 ASSERT가 발생하는 경우가 있다. */
 
-	int init_priority; /* 스레드가 priority 를 양도받았다가 다시 반납할 때 원래의 priority 를 복원할 수 있도록 고유의 priority 값을 저장하는 변수 */
-    struct lock *wait_on_lock;		/* 스레드가 현재 얻기 위해 기다리고 있는 lock 으로 스레드는 이 lock 이 release 되기를 기다린다 */
-    struct list donations;			/* 자신에게 priority 를 나누어준 스레드들의 리스트 */
-    struct list_elem donation_elem;	/* 이 리스트를 관리하기 위한 element 로 thread 구조체의 그냥 elem 과 구분하여 사용한다 */
-	/* P2_3 System Call 추가 */
+	int init_priority; /* priority 값을 저장하는 변수 */
+    struct lock *wait_on_lock;		
+    struct list donations;			
+    struct list_elem donation_elem;	
 	struct file **fd_table;
 	int fd_idx;
 };
@@ -120,14 +113,11 @@ int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
 
-/* ------------- project 1 ------------ */
 void thread_sleep(int64_t ticks);
 void thread_awake(int64_t ticks);
 int64_t get_next_tick_to_awake(void);
 bool thread_priority_compare (struct list_elem *element1, struct list_elem *element2, void *aux);
 bool preempt_by_priority(void);
 bool thread_donate_priority_compare (struct list_elem *element1, struct list_elem *element2, void *aux);
-/* ------------------------------------- */
-/* ------------------- project 2 -------------------- */
 struct thread* get_child_by_tid(tid_t tid);
 #endif /* threads/thread.h */
