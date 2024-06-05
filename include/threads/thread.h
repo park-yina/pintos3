@@ -123,6 +123,7 @@ struct thread {
 
 	struct file **file_descriptor_table;
 	int fdidx;
+	int fd_idx;                     /* for open file's fd in fd_table */
 
 	struct list child_list;
 	struct list_elem child_list_elem;
