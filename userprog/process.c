@@ -27,39 +27,8 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 
-void argument_stack(struct intr_frame *if_, int argv_cnt, char **argv_list) {
-	int i;
-	// char *argu_addr[128];
-	int argc_len;
+static void argument_stack(struct intr_frame *if_, int argv_cnt, char **argv_list);
 
-	for (i = argv_cnt-1; i >= 0; i--){
-		argc_len = strlen(argv_list[i]);
-		if_->rsp = if_->rsp - (argc_len+1); 
-		memcpy(if_->rsp, argv_list[i], (argc_len+1));
-		argv_list[i] = if_->rsp;
-	}
-
-	while (if_->rsp%8 != 0){
-		if_->rsp--;
-		memset(if_->rsp, 0, sizeof(uint8_t));
-	}
-
-	for (i = argv_cnt; i>=0; i--){
-		if_->rsp = if_->rsp - 8;
-		if (i == argv_cnt){
-			memset(if_->rsp, 0, sizeof(char **));
-		}else{
-			memcpy(if_->rsp, &argv_list[i] , sizeof(char **));
-		}
-	}
-
-	if_->rsp = if_->rsp - 8;
-	memset(if_->rsp, 0, sizeof(void *));
-
-	if_->R.rdi = argv_cnt;
-	if_->R.rsi = if_->rsp + 8;	
-
-}
 /* General process initializer for initd and other process. */
 static void
 process_init (void) {
@@ -323,15 +292,6 @@ process_exec (void *f_name) {
 
 	/* We first kill the current context */
 	process_cleanup (); 
-	/* 새로운 실행 파일을 현재 쓰레드에 담기 전에 현재 프로세스에 담긴 컨텍스트를 지운다. 
-		즉 현재 프로세스에 할당된 page directory를 지운다. */
-	/* 현재 실행 중인 스레드의 page directory와 switch information을 내려주는 역할을 한다
-		새로 생성되는 process를 실행하기 위해서는 CPU를 점유해야하는데, 지금은 kernel 모드로 돌아가고 있지만 
-		CPU를 선점하기 전에 지금 실행 중인 스레드와 context switching하기 위한 준비를 해야 하기 때문이다. */
-
-	// ------------------------------------------------------------
-	/* We first kill the current context. P2_1 추가 */
-	// 파일명을 추출해야 하지만 다른 인자들 또한 프로세스를 실행하는 데에 필요하므로 user stack에 저장한다.
 	int token_count = 0;
 	char *token, *last;
 	char *arg_list[64]; // arg_list라는 리스트를 생성하여 각 인자의 char *를 저장한다. 프로그램 명은 arg_list[0]에 저장되며, arg_list[1]부터 다른 인자들이 저장된다.
@@ -353,10 +313,7 @@ process_exec (void *f_name) {
 #endif
 
 	/* And then load the binary */
-	success = load (file_name_copy, &_if); // _if와 file_name을 현재 프로세스에 로드한다. 로드 성공시 1반환, else 0 */
-	// file을 load해주는 load 함수. 이 함수에서 parsing 작업을 추가해야한다. parshing 후 user stack에 넣는 코드 구현하면 됨
-	// load를 마치면 argument_stack() 함수를 이용하여 user stack에 인자들을 저장한다.
-
+	success = load (file_name_copy, &_if); 
 	/* If load failed, quit. */
 	palloc_free_page (file_name); // 밑에 if문 사이에 넣어봤더니 close-twice에서 FAIL떴었음.
 	// file_name은 프로그램 파일 이름을 입력하기 위해 생성한 임시 변수이기 때문에 load를 끝내면 해당 메모리를 반환해야 한다.
@@ -583,7 +540,8 @@ struct ELF64_PHDR {
 #define ELF ELF64_hdr
 #define Phdr ELF64_PHDR
 
-static bool validate_segment (const struct Phdr *phdr, struct file *file);
+static bool setup_stack (struct intr_frame *if_);
+static bool validate_segment (const struct Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
 		bool writable);
@@ -592,20 +550,6 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
  * Stores the executable's entry point into *RIP
  * and its initial stack pointer into *RSP.
  * Returns true if successful, false otherwise. */
-bool setup_stack (struct intr_frame *if_) {
-	uint8_t *kpage;
-	bool success = false;
-
-	kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-	if (kpage != NULL) {
-		success = install_page (((uint8_t *) USER_STACK) - PGSIZE, kpage, true);
-		if (success)
-			if_->rsp = USER_STACK;
-		else
-			palloc_free_page (kpage);
-	}
-	return success;
-}
 static bool // 페이지 테이블 생성
 load (const char *file_name, struct intr_frame *if_) {
 	struct thread *t = thread_current ();
@@ -734,7 +678,39 @@ done:
 	return success;
 }
 
+static void argument_stack(struct intr_frame *if_, int argv_cnt, char **argv_list) {
+	int i;
+	// char *argu_addr[128];
+	int argc_len;
 
+	for (i = argv_cnt-1; i >= 0; i--){
+		argc_len = strlen(argv_list[i]);
+		if_->rsp = if_->rsp - (argc_len+1); 
+		memcpy(if_->rsp, argv_list[i], (argc_len+1));
+		argv_list[i] = if_->rsp;
+	}
+
+	while (if_->rsp%8 != 0){
+		if_->rsp--;
+		memset(if_->rsp, 0, sizeof(uint8_t));
+	}
+
+	for (i = argv_cnt; i>=0; i--){
+		if_->rsp = if_->rsp - 8;
+		if (i == argv_cnt){
+			memset(if_->rsp, 0, sizeof(char **));
+		}else{
+			memcpy(if_->rsp, &argv_list[i] , sizeof(char **));
+		}
+	}
+
+	if_->rsp = if_->rsp - 8;
+	memset(if_->rsp, 0, sizeof(void *));
+
+	if_->R.rdi = argv_cnt;
+	if_->R.rsi = if_->rsp + 8;	
+
+}
 
 /* Checks whether PHDR describes a valid, loadable segment in
  * FILE and returns true if so, false otherwise. */
@@ -802,7 +778,7 @@ static bool install_page (void *upage, void *kpage, bool writable);
  *
  * Return true if successful, false if a memory allocation error
  * or disk read error occurs. */
-bool
+static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
 	ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
@@ -845,7 +821,21 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 }
 
 /* Create a minimal stack by mapping a zeroed page at the USER_STACK */
+static bool
+setup_stack (struct intr_frame *if_) {
+	uint8_t *kpage;
+	bool success = false;
 
+	kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+	if (kpage != NULL) {
+		success = install_page (((uint8_t *) USER_STACK) - PGSIZE, kpage, true);
+		if (success)
+			if_->rsp = USER_STACK;
+		else
+			palloc_free_page (kpage);
+	}
+	return success;
+}
 
 /* Adds a mapping from user virtual address UPAGE to kernel
  * virtual address KPAGE to the page table.
