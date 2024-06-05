@@ -6,14 +6,8 @@
 
 /* A counting semaphore. */
 struct semaphore {
-	unsigned value;             /* Current value. 공유 자원의 수 */
-	struct list waiters;        /* List of waiting threads. 공유 자원을 사용하기 위해 대기하고 있는 스레드들의 리스트 */
-};
-
-/* One semaphore in a list. */
-struct semaphore_elem {
-	struct list_elem elem;              /* List element. */
-	struct semaphore semaphore;         /* This semaphore. */
+	unsigned value;             /* Current value. */
+	struct list waiters;        /* List of waiting threads. */
 };
 
 void sema_init (struct semaphore *, unsigned value);
@@ -21,10 +15,6 @@ void sema_down (struct semaphore *);
 bool sema_try_down (struct semaphore *);
 void sema_up (struct semaphore *);
 void sema_self_test (void);
-
-/* PROJECT1: THREADS - Priority Scheduling */
-bool sema_compare_priority (const struct list_elem *l, const struct list_elem *s, void *aux);
-
 
 /* Lock. */
 struct lock {
@@ -47,7 +37,12 @@ void cond_init (struct condition *);
 void cond_wait (struct condition *, struct lock *);
 void cond_signal (struct condition *, struct lock *);
 void cond_broadcast (struct condition *, struct lock *);
+void donate_priority (void);
+void return_priority(void);
+void close_lock (struct lock *lock);
 
+bool cmp_sem_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool cmp_donation_priority(struct list_elem *cur,struct list_elem *cmp, void *aux);
 /* Optimization barrier.
  *
  * The compiler will not reorder operations across an
@@ -55,7 +50,4 @@ void cond_broadcast (struct condition *, struct lock *);
  * reference guide for more information.*/
 #define barrier() asm volatile ("" : : : "memory")
 
-/* ----------------- project 1 ----------------- */
-static bool sema_priority_compare(const struct list_elem *a, const struct list_elem *b, void *aux);
-/* --------------------------------------------- */
 #endif /* threads/synch.h */
