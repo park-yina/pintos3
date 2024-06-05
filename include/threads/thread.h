@@ -99,6 +99,7 @@ struct thread {
 
 	// Alarm clock
 	int64_t wakeup_tick;                      /* Priority. */
+	int64_t wake_up_tick;                      /* Priority. */
 
 	// Priority Scheduling
 	int priority;
@@ -109,6 +110,9 @@ struct thread {
 	int recent_cpu;
 	struct list_elem d_elem;
 	struct list_elem a_elem;
+    struct list_elem donation_elem;	
+	struct file **fd_table;   /* allocated in thread_create */	
+	struct list_elem child_elem; /* elem for this thread's parent's child_list */
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
