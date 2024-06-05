@@ -27,8 +27,39 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 
-static void argument_stack(struct intr_frame *if_, int argv_cnt, char **argv_list);
+void argument_stack(struct intr_frame *if_, int argv_cnt, char **argv_list) {
+	int i;
+	// char *argu_addr[128];
+	int argc_len;
 
+	for (i = argv_cnt-1; i >= 0; i--){
+		argc_len = strlen(argv_list[i]);
+		if_->rsp = if_->rsp - (argc_len+1); 
+		memcpy(if_->rsp, argv_list[i], (argc_len+1));
+		argv_list[i] = if_->rsp;
+	}
+
+	while (if_->rsp%8 != 0){
+		if_->rsp--;
+		memset(if_->rsp, 0, sizeof(uint8_t));
+	}
+
+	for (i = argv_cnt; i>=0; i--){
+		if_->rsp = if_->rsp - 8;
+		if (i == argv_cnt){
+			memset(if_->rsp, 0, sizeof(char **));
+		}else{
+			memcpy(if_->rsp, &argv_list[i] , sizeof(char **));
+		}
+	}
+
+	if_->rsp = if_->rsp - 8;
+	memset(if_->rsp, 0, sizeof(void *));
+
+	if_->R.rdi = argv_cnt;
+	if_->R.rsi = if_->rsp + 8;	
+
+}
 /* General process initializer for initd and other process. */
 static void
 process_init (void) {
@@ -703,39 +734,7 @@ done:
 	return success;
 }
 
-static void argument_stack(struct intr_frame *if_, int argv_cnt, char **argv_list) {
-	int i;
-	// char *argu_addr[128];
-	int argc_len;
 
-	for (i = argv_cnt-1; i >= 0; i--){
-		argc_len = strlen(argv_list[i]);
-		if_->rsp = if_->rsp - (argc_len+1); 
-		memcpy(if_->rsp, argv_list[i], (argc_len+1));
-		argv_list[i] = if_->rsp;
-	}
-
-	while (if_->rsp%8 != 0){
-		if_->rsp--;
-		memset(if_->rsp, 0, sizeof(uint8_t));
-	}
-
-	for (i = argv_cnt; i>=0; i--){
-		if_->rsp = if_->rsp - 8;
-		if (i == argv_cnt){
-			memset(if_->rsp, 0, sizeof(char **));
-		}else{
-			memcpy(if_->rsp, &argv_list[i] , sizeof(char **));
-		}
-	}
-
-	if_->rsp = if_->rsp - 8;
-	memset(if_->rsp, 0, sizeof(void *));
-
-	if_->R.rdi = argv_cnt;
-	if_->R.rsi = if_->rsp + 8;	
-
-}
 
 /* Checks whether PHDR describes a valid, loadable segment in
  * FILE and returns true if so, false otherwise. */
