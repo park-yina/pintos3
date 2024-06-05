@@ -21,7 +21,5 @@ struct container{
 };
 #define ELF ELF64_hdr
 #define Phdr ELF64_PHDR
-void process_activate (struct thread *next);
-void argument_stack (int argc, char **argv, struct intr_frame *if_);
 bool validate_segment(const struct Phdr *phdr, struct file *file);
 #endif /* userprog/process.h */
