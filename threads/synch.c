@@ -301,6 +301,10 @@ lock_held_by_current_thread (const struct lock *lock) {
 }
 
 /* One semaphore in a list. */
+struct semaphore_elem {
+	struct list_elem elem;              /* List element. */
+	struct semaphore semaphore;         /* This semaphore. */
+};
 
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
@@ -396,7 +400,7 @@ cond_broadcast (struct condition *cond, struct lock *lock) {
   3. get thread priority of first thread of semaphore's waiters 
   compare and return
  */
-static bool sema_priority_compare(const struct list_elem *a, const struct list_elem *b, void *aux){
+static bool sema_priority_compare(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
 	struct semaphore_elem *sema_elem_a;
 	struct semaphore_elem *sema_elem_b;
 	struct list *a_waiter;
@@ -472,3 +476,4 @@ void reset_priority(void){
 		}
 	}
 }
+/* ------------------- project 1 functions end ------------------------------- */
