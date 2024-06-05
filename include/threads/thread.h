@@ -113,6 +113,8 @@ struct thread {
     struct list_elem donation_elem;	
 	struct file **fd_table;   /* allocated in thread_create */	
 	struct list_elem child_elem; /* elem for this thread's parent's child_list */
+	struct list donation_list; /* list of threads that donate priority to **this thread** */
+	int initial_priority; /* thread's initial priority */
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
@@ -129,7 +131,8 @@ struct thread {
 	struct semaphore child_sema;
 	struct semaphore exit_sema; 
 	struct semaphore wait_sema;
-
+	struct semaphore fork_sema; /* parent thread should wait while child thread copy parent */
+	struct semaphore free_sema;
 	struct file *running;
 
 
