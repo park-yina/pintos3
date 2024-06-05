@@ -3,7 +3,8 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
-/* P3 추가 */
+#include "threads/vaddr.h"
+#include "vm/file.h"
 bool delete_page (struct hash *pages, struct page *p);
 unsigned page_hash(const struct hash_elem *p_, void *aux UNUSED);
 bool page_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
