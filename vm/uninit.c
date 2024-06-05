@@ -41,25 +41,31 @@ void uninit_new(struct page *page, void *va, vm_initializer *init,
 }
 
 /* Initalize the page on first fault */
-static bool uninit_initialize(struct page *page, void *kva) {
-    struct uninit_page *uninit = &page->uninit;
+static bool
+uninit_initialize (struct page *page, void *kva) {
+	struct uninit_page *uninit = &page->uninit;
 
-    /* Fetch first, page_initialize may overwrite the values */
-    vm_initializer *init = uninit->init;
-    void *aux = uninit->aux;
+	/* Fetch first, page_initialize may overwrite the values */
+	vm_initializer *init = uninit->init;
+	void *aux = uninit->aux;
 
-    /* Initialize the page using the provided page_initializer */
-    return uninit->page_initializer(page, uninit->type, kva) && (init ? init(page, aux) : true);
+	/* TODO: You may need to fix this function. */
+	return uninit->page_initializer (page, uninit->type, kva) &&
+		(init ? init (page, aux) : true);
 }
 
-/* Free the resources held by uninit_page. Although most pages are transmuted
+/* Free the resources hold by uninit_page. Although most of pages are transmuted
  * to other page objects, it is possible to have uninit pages when the process
- * exits, which are never referenced during the execution.
+ * exit, which are never referenced during the execution.
  * PAGE will be freed by the caller. */
-static void uninit_destroy(struct page *page) {
-    struct uninit_page *uninit UNUSED = &page->uninit;
-    /* TODO: Fill this function.
-     * TODO: If you don't have anything to do, just return. */
-    // Currently, there is nothing to free or clean up for uninit pages.
-    return;
+static void
+uninit_destroy (struct page *page) {
+	struct uninit_page *uninit = &page->uninit;
+	/* TODO: Fill this function.
+	 * TODO: If you don't have anything to do, just return. */
+	struct lazy_load_info * info = (struct lazy_load_info *)(uninit->aux);
+	file_close(&info->file);
+	
+	// 'file_close' frees 'info'
+	//free(info); // malloc in 'process.c load_segment' or 'hash_action_copy'
 }
