@@ -149,6 +149,8 @@ struct thread {
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
+	uint64_t rsp; // a page fault occurs in the kernel
+
 };
 
 /* If false (default), use round-robin scheduler.
