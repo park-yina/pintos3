@@ -78,7 +78,6 @@ void thread_awake(int64_t ticks);
 int64_t get_next_tick_to_awake(void);
 bool thread_priority_compare (struct list_elem *element1, struct list_elem *element2, void *aux UNUSED); 
 bool preempt_by_priority(void);
-bool thread_donate_priority_compare (struct list_elem *element1, struct list_elem *element2, void *aux UNUSED);
 /* -------------------------------------------------- */
 /* ------------------- project 2 -------------------- */
 struct thread* get_child_by_tid(tid_t tid);
@@ -656,27 +655,6 @@ do_schedule(int status) {
 	thread_current ()->status = status;
 	schedule ();
 }
-
-/* depth 는 nested 의 최대 깊이를 지정해주기 위해 사용했다(max_depth = 8). 
-	스레드의 wait_on_lock 이 NULL 이 아니라면 스레드가 lock 에 걸려있다는 소리이므로 
-	그 lock 을 점유하고 있는 holder 스레드에게 priority 를 넘겨주는 방식을 깊이 8의 스레드까지 반복한다. 
-	wait_on_lock == NULL 이라면 더 이상 donation 을 진해할 필요가 없으므로 break 해준다. */
-void
-donate_priority (void)
-{ /* nest donation */
-  int depth;
-  struct thread *cur = thread_current ();
-
-  for (depth = 0; depth < 8; depth++){ // testcase가 최대 7까지 있어서 8로 설정
-    if (!cur->wait_on_lock) break;
-      struct thread *holder = cur->wait_on_lock->holder;
-      holder->priority = cur->priority;
-      cur = holder;
-  }
-}
-
-/* sheduling 함수는 thread_yield(), thread_block(), thread_exit() 함수 내의 거의 마지막 부분에 실행되어 
-	CPU 의 소유권을 현재 실행중인 스레드에서 다음에 실행될 스레드로 넘겨주는 작업을 한다. */
 static void
 schedule (void) {
 	/* 현재 실행중인 thread 를 thread A 라고 하고, 다음에 실행될 스레드를 thread B 라고 하겠다. 
