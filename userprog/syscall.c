@@ -1,53 +1,23 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include <stdbool.h>
+#include "devices/input.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/loader.h"
-#include "userprog/gdt.h"
-#include "threads/flags.h"
-#include "intrinsic.h" 
-#include "filesys/file.h"
-#include "userprog/process.h"
-#include "kernel/stdio.h"
+#include "threads/synch.h"
 #include "threads/palloc.h"
-#include "vm/vm.h"
-#include <list.h>
-#include "threads/vaddr.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
-#include <list.h>
-#include "threads/palloc.h"
-#include "threads/vaddr.h"
+#include "kernel/stdio.h"
+#include "userprog/gdt.h"
+#include "threads/flags.h"
+#include "intrinsic.h"
 #include "userprog/process.h"
 
-
-void syscall_entry (void);
-void syscall_handler (struct intr_frame *);
-
-static struct file *find_file_by_fd(int fd);
-
-struct page *check_address(void * addr);
-void check_valid_buffer(void *buffer, unsigned size, void *rsp, bool to_write);
-
-void halt (void);			/* 구현 완료 */
-void exit (int status);		/* 구현 완료 */
-tid_t fork (const char *thread_name, struct intr_frame *f);
-int exec (const char *cmd_line);
-int wait (tid_t child_tid); 
-bool create (const char *file, unsigned initial_size); 	/* 구현 완료 */
-bool remove (const char *file);							/* 구현 완료 */
-int open (const char *file);
-int filesize (int fd);
-int read (int fd, void *buffer, unsigned size);
-int write (int fd, const void *buffer, unsigned size);
-void seek (int fd, unsigned position);
-unsigned tell (int fd);
-void close (int fd);
-/* ------------------------------- */
-
-void *mmap (void *addr, size_t length, int writable, int fd, off_t offset);
-void munmap (void *addr);
+void syscall_entry(void);
+void syscall_handler(struct intr_frame *);
 
 /* System call.
  *
@@ -58,409 +28,318 @@ void munmap (void *addr);
  * The syscall instruction works by reading the values from the the Model
  * Specific Register (MSR). For the details, see the manual. */
 
-
-#define MSR_STAR 0xc0000081         /* Segment selector msr */
-#define MSR_LSTAR 0xc0000082        /* Long mode SYSCALL target */
+#define MSR_STAR 0xc0000081			/* Segment selector msr */
+#define MSR_LSTAR 0xc0000082		/* Long mode SYSCALL target */
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
-/* ---------- Project 2 ---------- */
-const int STDIN = 0;
-const int STDOUT = 1;
-/* ------------------------------- */
+#define STDIN_fileNO 0
+#define STDOUT_fileNO 1
 
-void
-syscall_init (void) {
-	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
-			((uint64_t)SEL_KCSEG) << 32);
-	write_msr(MSR_LSTAR, (uint64_t) syscall_entry);
+void check_address(void *addr);
+void halt(void);
+void exit(int status);
+bool create(const char *file, unsigned initial_size);
+bool remove(const char *file);
+int open(const char *file_name);
+int filesize(int fd);
+int read(int fd, void *buffer, unsigned size);
+int write(int fd, const void *buffer, unsigned size);
+void seek(int fd, unsigned position);
+unsigned tell(int fd);
+void close(int fd);
+int fork(const char *thread_name, struct intr_frame *f);
+int exec(const char *cmd_line);
+int wait(int pid);
+
+void syscall_init(void)
+{
+	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48 |
+							((uint64_t)SEL_KCSEG) << 32);
+	write_msr(MSR_LSTAR, (uint64_t)syscall_entry);
+	// lock_init(&filesys_lock);
 
 	/* The interrupt service rountine should not serve any interrupts
 	 * until the syscall_entry swaps the userland stack to the kernel
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
-			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
-
-	/* ---------- Project 2 ---------- */
-	lock_init(&filesys_lock);
-	/* ------------------------------- */
+			  FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
 
-void
-syscall_handler (struct intr_frame *f UNUSED) {
+/* The main system call interface */
+void syscall_handler(struct intr_frame *f UNUSED)
+{
+	int syscall_num = f->R.rax;
 
-	/* ---------- Project 2 ---------- */
-	switch(f->R.rax) {
-		case SYS_HALT:
-			halt();
-			break;
-		case SYS_EXIT:
-			exit(f->R.rdi);
-			break;
-		case SYS_FORK:
-			f->R.rax = fork(f->R.rdi, f);
-			break;
-		case SYS_EXEC:
-			if (exec(f->R.rdi) == -1)
-				exit(-1);
-			break;
-		case SYS_WAIT:
-			f->R.rax = process_wait(f->R.rdi);
-			break;
-		case SYS_CREATE:
-			f->R.rax = create(f->R.rdi, f->R.rsi);
-			break;
-		case SYS_REMOVE:
-			f->R.rax = remove(f->R.rdi);
-			break;
-		case SYS_OPEN:
-			f->R.rax = open(f->R.rdi);
-			break;
-		case SYS_FILESIZE:
-			f->R.rax = filesize(f->R.rdi);
-			break;
-		case SYS_READ:
-			check_valid_buffer(f->R.rsi, f->R.rdx, f->rsp, 1);
-			f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
-			break;
-		case SYS_WRITE:
-			check_valid_buffer(f->R.rsi, f->R.rdx, f->rsp, 0);
-			f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
-			break;
-		case SYS_SEEK:
-			seek(f->R.rdi, f->R.rsi);
-			break;
-		case SYS_TELL:
-			f->R.rax = tell(f->R.rdi);
-			break;
-		case SYS_CLOSE:
-			close(f->R.rdi);
-			break;
-		case SYS_MMAP:
-			f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
-			break;
-		case SYS_MUNMAP:
-			munmap(f->R.rdi);
-			break;
-		default:
-			exit(-1);
-			break;
+	check_address(f->rsp);
+
+	switch (syscall_num)
+	{
+	case SYS_HALT:
+		halt();
+		break;
+	case SYS_EXIT:
+		exit(f->R.rdi);
+		break;
+	case SYS_FORK:
+		f->R.rax = fork(f->R.rdi, f);
+		break;
+	case SYS_EXEC:
+		f->R.rax = exec(f->R.rdi);
+		break;
+	case SYS_WAIT:	
+		f->R.rax = wait(f->R.rdi);
+		break;
+	case SYS_CREATE:
+		f->R.rax = create(f->R.rdi, f->R.rsi);
+		break;
+	case SYS_REMOVE:
+		f->R.rax = remove(f->R.rdi);
+		break;
+	case SYS_OPEN:
+		f->R.rax = open(f->R.rdi);
+		break;
+	case SYS_FILESIZE:
+		f->R.rax = filesize(f->R.rdi);
+		break;
+	case SYS_READ:
+		f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
+		break;
+	case SYS_WRITE:
+		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
+		break;
+	case SYS_SEEK:
+		seek(f->R.rdi, f->R.rsi);
+		break;
+	case SYS_TELL:
+		f->R.rax = tell(f->R.rdi);
+		break;
+	case SYS_CLOSE:
+		close(f->R.rdi);
+		break;
 	}
-	/* ------------------------------- */
+	// thread_exit ();
 }
 
-/* ---------- Project 2 구현, P3 수정 추가 ---------- */
-// void 
-// check_address (const uint64_t *uaddr) {
-// 	struct thread *curr = thread_current();
-// 	// if (user_addr = NULL || !(is_user_vaddr(user_addr)) || pml4_get_page(curr->pml4, user_addr) == NULL) {
-// 	if (uaddr == NULL || !(is_user_vaddr(uaddr))) { /* P3 수정 */
-// 		exit(-1);
-// 	}
-// 	#ifdef DEBUG
-// 	else if(pml4_get_page(cur->pml4, uaddr) == NULL)
-// 	{
-// 		printf("Check address fault at - %p\n", uaddr);
-// 	}
-// 	#endif
-// }
-
-struct page * check_address(void * addr) {
-	if (addr == NULL || is_kernel_vaddr(addr)) {
+void check_address(void *addr)
+{
+	// NULL 포인터인지 체크 NULL 이면 EXIT
+	if (addr == NULL)
 		exit(-1);
-	}
-
-	return spt_find_page(&thread_current()->spt, addr);
+	// 포인터가 USER 영역인지 체크 커널이면 EXIT
+	if (!is_user_vaddr(addr))
+		exit(-1);
+	// 현재 스레드의 페이지 맵 레벨 4(pml4)를 확인하여 주어진 주소에 대한 페이지가 있는지 확인하는 pml4_get_page 함수를 호출 만약 해당 주소에 대한 페이지가 없다면 EXIT
+	if (pml4_get_page(thread_current()->pml4, addr) == NULL)
+		exit(-1);
 }
 
-void check_valid_buffer(void *buffer, unsigned size, void *rsp, bool to_write) {
-	for (int i = 0; i < size; i++) {
-		struct page* page = check_address(buffer + i);
-		
-		/* 해당 주소가 포함된 페이지가 spt에 없는 경우 */
-		if (page == NULL) {
-			exit(-1);
-		}
-
-		/* write 시스템 콜을 호출했는데 쓰기가 허용되지 않는 페이지인 경우 */
-		if (to_write == true && page->writable == false) {
-			exit(-1);
-		}
-	}
-}
-
-// Project 2-4. File descriptor
-// Check if given fd is valid, return cur->fdTable[fd]
-static struct file *find_file_by_fd(int fd)
+void halt(void)
 {
-	struct thread *cur = thread_current();
-
-	// Error - invalid fd
-	if (fd < 0 || fd >= FDCOUNT_LIMIT)
-		return NULL;
-
-	return cur->fd_table[fd]; // automatically returns NULL if empty
-}
-
-/* Check validity of given file descriptor in current thread fd_table */
-static struct file *
-get_file_from_fd_table(int fd) {
-	struct thread *curr = thread_current();
-
-	if (fd < 0 || fd >= FDCOUNT_LIMIT) {
-		return NULL;
-	}
-
-	return curr->fd_table[fd];	/*return fd of current thread. if fd_table[fd] == NULL, it automatically returns NULL*/
-}
-
-/* Remove give fd from current thread fd_table */
-void
-remove_file_from_fdt(int fd)
-{
-	struct thread *cur = thread_current();
-
-	if (fd < 0 || fd >= FDCOUNT_LIMIT) /* Error - invalid fd */
-		return;
-
-	cur->fd_table[fd] = NULL;
-}
-
-/* Find available spot in fd_talbe, put file in  */
-int 
-add_file_to_fdt(struct file *file) {
-	struct thread *curr = thread_current();
-	struct file **fdt = curr->fd_table;
-
-	while (curr->fd_idx < FDCOUNT_LIMIT && fdt[curr->fd_idx]) {
-		curr->fd_idx++;
-	}
-
-	if (curr->fd_idx >= FDCOUNT_LIMIT) {
-		return -1;
-	}
-
-	fdt[curr->fd_idx] = file;
-	return curr->fd_idx;
-}
-
-void 
-halt (void) {
 	power_off();
 }
 
-void exit(int status) {
-	struct thread *curr = thread_current();
-	curr->exit_status = status;
-
-	printf("%s: exit(%d)\n", thread_name(), status);
-	
+void exit(int status)
+{
+	struct thread *cur = thread_current (); 
+	cur->exit_status = status;
+	printf("%s: exit(%d)\n" , cur -> name , status);
 	thread_exit();
 }
 
-tid_t fork (const char *thread_name, struct intr_frame *f) {
-	// check_address(thread_name);
+int exec(const char *cmd_line)
+{
+		check_address(cmd_line);
+
+		char *file_name = palloc_get_page(PAL_ZERO);
+
+		if(file_name == NULL)
+			exit(-1);
+		
+		strlcpy(file_name, cmd_line, PGSIZE);
+
+		if(process_exec(file_name) == -1)
+			exit(-1);
+}
+
+int wait(int pid)
+{
+	return process_wait(pid);
+
+}
+
+int fork(const char *thread_name, struct intr_frame *f)
+{
 	return process_fork(thread_name, f);
 }
 
-int
-exec(const char *cmd_line) {
-	check_address(cmd_line);
-
-	char *cmd_line_cp;
-	
-	int size = strlen(cmd_line);
-	cmd_line_cp = palloc_get_page(0);
-	if (cmd_line_cp == NULL) {
-		exit(-1);
-	}
-	strlcpy (cmd_line_cp, cmd_line, size + 1);
-
-	if (process_exec(cmd_line_cp) == -1) {
-		return -1;
-	}
-
-	NOT_REACHED();
-	return 0;
-}
-
-bool 
-create (const char *file, unsigned initial_size) {
+bool create(const char *file, unsigned initial_size)
+{
 	check_address(file);
 	return filesys_create(file, initial_size);
 }
 
-bool 
-remove (const char *file) {
+bool remove(const char *file)
+{
 	check_address(file);
 	return filesys_remove(file);
 }
 
-int
-open (const char *file) {
+int open(const char *file)
+{
 	check_address(file);
-	lock_acquire(&filesys_lock);
 
-	if (file == NULL) {
-		lock_release(&filesys_lock);
-		return -1;
-	}
 	struct file *open_file = filesys_open(file);
 
-	if (open_file == NULL) {
-		lock_release(&filesys_lock);
+	if (open_file == NULL)
 		return -1;
+
+	if(strcmp(thread_name(), file) == 0) {
+		file_deny_write(open_file);
 	}
+
+	int fd = process_add_file(open_file);
+
+    if (fd == -1)
+        file_close(open_file);
 	
-	int fd = add_file_to_fdt(open_file);
 
-	if (fd == -1) {
-		file_close(open_file);
-	}
-
-	lock_release(&filesys_lock);
 	return fd;
 }
 
-int
-filesize (int fd) {
-	struct file *open_file = get_file_from_fd_table(fd);
-	
-	if (open_file == NULL) {
+int filesize(int fd)
+{	
+	if (fd < 2)
 		return -1;
-	}
-	return file_length(open_file);
+	
+	struct file *file = process_get_file(fd);
+
+	if (file == NULL)
+		return -1;
+	
+	file_length(file);
 }
 
-int
-read (int fd, void *buffer, unsigned size) {
-	check_address(buffer);
-	lock_acquire(&filesys_lock);
-
-
-	int ret;
-	struct file *file_obj = get_file_from_fd_table(fd);
-
-	if (file_obj == NULL) {	/* if no file in fdt, return -1 */
-		lock_release(&filesys_lock);
+int read(int fd, void *buffer, unsigned size)
+{
+	if (fd < 2)
 		return -1;
-	}
+	check_address(buffer);
 
-	/* STDIN */
-	if (fd == STDIN) {
-		int i;
-		unsigned char *buf = buffer;
-		for (i = 0; i < size; i++) {
-			char c = input_getc();
-			*buf++ = c;
-			if (c == '\0')
+	int byte;
+	unsigned char *buf = buffer;
+	struct file *file = process_get_file(fd);
+
+	if(file == NULL)
+		return -1;
+	
+	if (fd == STDIN_fileNO){
+		char *input;
+
+		for (int i = 0 ; i < size ; i++){
+			input = input_getc();
+			if (input == "\n")
 				break;
+			*buf = input;
+			buf++;
+			byte++;
 		}
-
-		ret = i;
 	}
-	/* STDOUT */
-	else if (fd == STDOUT) {
-		ret = -1;
+	else{
+		// lock_acquire(&filesys_lock);
+		byte = file_read(file, buffer, size);
+		// lock_release(&filesys_lock);
 	}
-	else {	
-		ret = file_read(file_obj, buffer, size);
-	}
-
-	lock_release(&filesys_lock);
-	
-	return ret;
+	return byte;
 }
 
-int
-write (int fd, const void *buffer, unsigned size) {
+int write(int fd, const void *buffer, unsigned size)
+{
 	check_address(buffer);
-	lock_acquire(&filesys_lock);
 
-	int ret;
-	struct file *file_obj = get_file_from_fd_table(fd);
+	// lock_acquire(&filesys_lock);
 	
-	if (file_obj == NULL) {
-		lock_release(&filesys_lock);
+	if (fd == STDIN_fileNO){
+		// lock_release(&filesys_lock);
 		return -1;
 	}
 
-	/* STDOUT */
-	if (fd == STDOUT) {
-		putbuf(buffer, size);		/* to print buffer strings on the display*/
-		ret = size;
-	}
-	/* STDOUT */
-	else if (fd == STDIN) {
-		ret = -1;
-	}
-	else {
-		ret = file_write(file_obj, buffer, size);
+
+	if (fd == STDOUT_fileNO)
+	{
+		putbuf(buffer, size);
+		// lock_release(&filesys_lock);
+		return size;
 	}
 
-	lock_release(&filesys_lock);
+	int byte;
+	struct file *file = process_get_file(fd);
 
-	return ret;
+	if(file == NULL){
+		// lock_release(&filesys_lock);
+		return -1; 
+	}
+	
+	// lock_release(&filesys_lock);
+	
+	return (int)file_write(file, buffer, size);
 }
 
-void
-seek (int fd, unsigned position) {
-	struct file *file_obj = get_file_from_fd_table(fd);
+// int write(int fd, const void *buffer, unsigned size)
+// {
+// 	check_address(buffer);
+// 	int byte;
 
-	if (file_obj == NULL) {
-		return;
-	}
+// 	if (fd == STDIN_fileNO){
+// 		return -1;
+// 	}
+
+// 	struct file *file = process_get_file(fd);
 	
-	if (fd <= 1) {
-		return;
-	}
+// 	if(file == NULL){
+// 		return -1; 
+// 	}
+
+// 	// lock_acquire(&filesys_lock);
+
+// 	if (fd == STDOUT_fileNO)
+// 	{
+// 		putbuf(buffer, size);
+// 		byte = size;
+// 	}
+
+// 	byte = (int)file_write(file, buffer, size);
 	
-	file_seek(file_obj, position);
+// 	// lock_release(&filesys_lock);
+	
+// 	return byte;
+// }
+
+void seek(int fd, unsigned position)
+{
+	if (fd < 2)
+		return -1;
+	struct file *file = process_get_file(fd);
+	if (file == NULL)
+		return -1;
+	file_seek(file, position);
 }
 
 unsigned
-tell (int fd) {
-	struct file *file_obj = get_file_from_fd_table(fd);
-
-	if (file_obj == NULL) {
-		return;
-	}
-
-	if (fd <= 1) {
-		return;
-	}
-	
-	file_tell(file_obj);	
+tell(int fd)
+{
+	if (fd < 2)
+		return -1;
+	struct file *file = process_get_file(fd);
+	if (file == NULL)
+		return -1;
+	return file_tell(file);
 }
 
-void
-close (int fd) {
-	struct file *file_obj = get_file_from_fd_table(fd);
-
-	if (file_obj == NULL) {
-		return;
+void close(int fd)
+{	
+	struct file *file = process_get_file(fd);
+	if (file == NULL){
+		exit(-1);
 	}
-
-	if (fd <= 1) {
-		return;
-	}
-	
-	remove_file_from_fdt(fd);
-
-	file_close(file_obj);
-}
-
-void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
-	if(fd == 0 || fd == 1 || length == 0 || addr == 0 || pg_ofs(addr) != 0 || offset > PGSIZE)
-		return NULL;
-
-	struct file *file = find_file_by_fd(fd);	
-
-	// Fail : NULL file, file length is zero
-	if (file == NULL || file_length(file) == 0)
-		return NULL;
-
-	return do_mmap(addr, length, writable, file, offset);
-}
-
-void munmap (void *addr){
-	do_munmap(addr);
+	file_close(file);
+	process_close_file(fd);
 }
