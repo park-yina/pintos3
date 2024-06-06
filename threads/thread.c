@@ -216,8 +216,40 @@ thread_print_stats (void) {
    PRIORITY, but no actual priority scheduling is implemented.
    Priority scheduling is the goal of Problem 1-3. */
 
+void 
+max_priority(void){
+	if (list_empty(&ready_list))
+	{
+		return;
+	}
+	
+	if(thread_current() == idle_thread){
+		return;
+	}
+	int curr_priority = thread_current()->priority;
+	list_sort(&ready_list, cmp_priority, NULL);
 
+	struct list_elem *e= list_begin(&ready_list);
+	struct thread *t = list_entry(e, struct thread, elem);
+	
+	if (curr_priority < t->priority){
+		thread_yield();
+	}
+}
 
+bool cmp_priority(struct list_elem *cur,struct list_elem *cmp, void *aux){
+	int cur_priority = list_entry(cur, struct thread, elem)->priority;
+	int cmp_priority = list_entry(cmp, struct thread, elem)->priority;
+
+	return cur_priority > cmp_priority;
+}
+
+bool cmp_sema_priority(struct list_elem *cur,struct list_elem *cmp, void *aux){
+	int cur_priority = list_entry(cur, struct thread, d_elem)->priority;
+	int cmp_priority = list_entry(cmp, struct thread, d_elem)->priority;
+
+	return cur_priority > cmp_priority;
+}
 /* Sets the current thread's priority to NEW_PRIORITY. 현재 스레드의 우선순위를 새 우선순위로 정한다. */ 
 void
 thread_set_priority (int new_priority) {
