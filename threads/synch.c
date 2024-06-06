@@ -89,7 +89,6 @@ sema_down (struct semaphore *sema) {
    sema->value--;
    intr_set_level (old_level);
 }
-
 /* Down or "P" operation on a semaphore, but only if the
    semaphore is not already 0.  Returns true if the semaphore is
    decremented, false otherwise.
@@ -137,7 +136,6 @@ sema_up (struct semaphore *sema) {
    max_priority();
    intr_set_level (old_level);
 }
-
 static void sema_test_helper (void *sema_);
 
 /* Self-test for semaphores that makes control "ping-pong"
@@ -228,6 +226,7 @@ lock_acquire (struct lock *lock) {
 	curr_thread->wait_on_lock = NULL;				
 	lock->holder = curr_thread;	
 }
+
 
 /* Tries to acquires LOCK and returns true if successful or false
    on failure.  The lock must not already be held by the current

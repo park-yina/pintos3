@@ -221,12 +221,12 @@ thread_print_stats (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. 현재 스레드의 우선순위를 새 우선순위로 정한다. */ 
 void
 thread_set_priority (int new_priority) {
-  thread_current ()->init_priority = new_priority;
-  refresh_priority (); /* Donate 추가 */ // 우선순위 내림차순 정렬
-  thread_test_preemption (); /* Priority Scheduling 추가 */
-  
+	if (thread_mlfqs)
+    return;
+	thread_current ()->init_priority = new_priority;
+	return_priority();
+	max_priority();
 }
-
 tid_t
 thread_create (const char *name, int priority,
 		thread_func *function, void *aux) {
