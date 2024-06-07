@@ -44,48 +44,57 @@ static struct frame *vm_evict_frame (void);
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
  * `vm_alloc_page`. */
-/* 이니셜라이저를 사용하여 보류 중인 페이지 객체를 만듭니다. 
-	페이지를 생성하려면 직접 작성하지 말고, 이 함수 또는 'vm_alloc_page'를 통해 수행합니다. */
 
-bool vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable, vm_initializer *init, void *aux) {
-	ASSERT (VM_TYPE(type) != VM_UNINIT)
-	struct supplemental_page_table *spt = &thread_current ()->spt;
+bool vm_alloc_page_with_initializer(enum vm_type type, void *upage, bool writable, vm_initializer *init, void *aux) {
+    ASSERT(VM_TYPE(type) != VM_UNINIT);
+    struct supplemental_page_table *spt = &thread_current()->spt;
 
-	/* Check wheter the upage is already occupied or not. */
-	if (spt_find_page (spt, upage) == NULL) {
-		/* TODO: Create the page, fetch the initialier according to the VM type, 
-							and then create "uninit" page struct by calling uninit_new. 
-							You should modify the field after calling the uninit_new. */
-		/* P3 추가 */
-		bool (*initializer)(struct page *, enum vm_type, void *);
-		switch(type){
-			case VM_ANON: case VM_ANON|VM_MARKER_0: // 왜 두번째 케이스에서 저렇게 이중(?)으로 체크하지?
-				initializer = anon_initializer;
-				break;
-			case VM_FILE:
-				initializer = file_backed_initializer;
-				break;
-		}
+    /* Check whether the upage is already occupied or not. */
+    if (spt_find_page(spt, upage) == NULL) {
+        bool (*initializer)(struct page *, enum vm_type, void *) = NULL;
 
-		struct page *new_page = malloc(sizeof(struct page));
-		uninit_new (new_page, upage, init, type, aux, initializer);
+        switch (type) {
+            case VM_ANON:
+            case VM_ANON | VM_MARKER_0:
+                initializer = anon_initializer;
+                break;
+            case VM_FILE:
+                initializer = file_backed_initializer;
+                break;
+            default:
+                return false;
+        }
 
-		new_page->writable = writable;
-		// new_page->page_cnt = -1; // only for file-mapped pages
+        // Check if initializer is set
+        if (initializer == NULL) {
+            return false;
+        }
 
-		/* TODO: Insert the page into the spt. */
-		spt_insert_page(spt, new_page); // should always return true - checked that upage is not in spt
-				
-	#ifdef DBG
-		printf("Inserted new page into SPT - va : %p / writable : %d\n", new_page->va, writable);
-	#endif
+        struct page *new_page = (struct page *)malloc(sizeof(struct page));
+        if (new_page == NULL) {
+            // Allocation failed
+            return false;
+        }
 
-		return true;
-	}
-err:
-	return false;
+        uninit_new(new_page, upage, init, type, aux, initializer);
+        new_page->writable = writable;
+
+        /* Insert the page into the spt. */
+        if (!spt_insert_page(spt, new_page)) {
+            // spt_insert_page failed, free allocated memory
+            free(new_page);
+            return false;
+        }
+
+    #ifdef DBG
+        printf("Inserted new page into SPT - va: %p / writable: %d\n", new_page->va, writable);
+    #endif
+
+        return true;
+    }
+
+    return false;
 }
-
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
