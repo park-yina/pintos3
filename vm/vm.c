@@ -179,7 +179,7 @@ static struct frame *vm_get_frame (void) {
 }
 
 /* Growing the stack. */
-static void vm_stack_growth (void *addr UNUSED) {
+static void vm_stack_growth (void *addr) {
 	vm_alloc_page(VM_ANON | VM_MARKER_0, addr, true); // Create uninit page for stack; will become anon page
 	//bool success = vm_claim_page(addr);
 }

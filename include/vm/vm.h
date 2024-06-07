@@ -31,7 +31,7 @@ bool page_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux
 struct list frame_table; 
 void hash_action_copy (struct hash_elem *e, void *hash_aux);
 void hash_action_destroy (struct hash_elem *e, void *aux);
-static void vm_stack_growth (void *addr);
+void vm_stack_growth (void *addr);
 #include "vm/uninit.h"
 #include "vm/anon.h"
 #include "vm/file.h"
