@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 #include "lib/kernel/hash.h"
+#include "off_t.h"
+
 struct lazy_load_info {
 	struct file *file;
 	size_t page_read_bytes;
