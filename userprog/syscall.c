@@ -310,6 +310,7 @@ void close(int fd)
 	if (file == NULL){
 		exit(-1);
 	}
+	
 	file_close(file);
 	process_close_file(fd);
 }
