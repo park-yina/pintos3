@@ -45,56 +45,38 @@ static struct frame *vm_evict_frame (void);
  * page, do not create it directly and make it through this function or
  * `vm_alloc_page`. */
 
-bool vm_alloc_page_with_initializer(enum vm_type type, void *upage, bool writable, vm_initializer *init, void *aux) {
-    ASSERT(VM_TYPE(type) != VM_UNINIT);
-    struct supplemental_page_table *spt = &thread_current()->spt;
+bool vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable, vm_initializer *init, void *aux) {
+	ASSERT (VM_TYPE(type) != VM_UNINIT);
 
-    /* Check whether the upage is already occupied or not. */
-    if (spt_find_page(spt, upage) == NULL) {
-        bool (*initializer)(struct page *, enum vm_type, void *) = NULL;
+	struct supplemental_page_table *spt = &thread_current ()->spt;
 
-        switch (type) {
-            case VM_ANON:
-            case VM_ANON | VM_MARKER_0:
-                initializer = anon_initializer;
-                break;
-            case VM_FILE:
-                initializer = file_backed_initializer;
-                break;
-            default:
-                return false;
-        }
+	/* Check whether the upage is already occupied or not. */
+	if (spt_find_page (spt, upage) == NULL) {
+		struct page *page = malloc(sizeof (struct page));
 
-        // Check if initializer is set
-        if (initializer == NULL) {
-            return false;
-        }
-
-        struct page *new_page = (struct page *)malloc(sizeof(struct page));
-        if (new_page == NULL) {
-            // Allocation failed
-            return false;
-        }
-
-        uninit_new(new_page, upage, init, type, aux, initializer);
-        new_page->writable = writable;
-
-        /* Insert the page into the spt. */
-        if (!spt_insert_page(spt, new_page)) {
-            // spt_insert_page failed, free allocated memory
-            free(new_page);
-            return false;
-        }
-
-    #ifdef DBG
-        printf("Inserted new page into SPT - va: %p / writable: %d\n", new_page->va, writable);
-    #endif
-
-        return true;
-    }
-
-    return false;
+		switch (VM_TYPE(type)){
+			case VM_ANON:
+				uninit_new(page, pg_round_down(upage), init, type, aux, anon_initializer);
+				break;
+			case VM_FILE:
+				uninit_new(page, pg_round_down(upage), init, type, aux, file_backed_initializer);
+				break;
+			default:
+				free(page);
+				goto err;
+		}
+		
+		page->writable = writable;
+		if(!spt_insert_page(spt, page)){
+			free(page);
+			goto err;
+		}
+		return true;	
+	}
+err:
+	return false;
 }
+
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
@@ -323,136 +305,38 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 	return true;
 }
 
-/* Free the resource hold by the supplemental page table */
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
-	hash_destroy(&spt->spt_hash, hash_action_destroy); /* P3 추가 */
+	hash_clear(&spt->spt_hash, hash_action_destroy);
 }
 
-/* P3 추가 */
-// 해시 테이블 초기화할 때 해시 값을 구해주는 함수의 포인터
-unsigned page_hash(const struct hash_elem *p_, void *aux UNUSED) {
-    const struct page *p = hash_entry(p_, struct page, hash_elem);
-    return hash_bytes(&p->va, sizeof p->va);
+// hash 함수
+uint64_t hash_func (const struct hash_elem *e, void *aux){
+	const struct page *p = hash_entry(e,struct page, hash_elem);
+	return hash_bytes(&p->va,sizeof(p->va));
 }
 
-// 해시 테이블 초기화할 때 해시 요소들 비교하는 함수의 포인터
-// a가 b보다 작으면 true, 반대면 false
-bool page_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED) {
-    const struct page *a = hash_entry(a_, struct page, hash_elem);
-    const struct page *b = hash_entry(b_, struct page, hash_elem);
+bool less_func (const struct hash_elem *a, const struct hash_elem *b, void *aux){
+	const struct page *p_a = hash_entry(a, struct page, hash_elem);
+	const struct page *p_b = hash_entry(b, struct page, hash_elem); 
 
-    return a->va < b->va;
+	return p_a->va < p_b->va;
 }
 
-/* P3 추가 */
-void hash_action_copy (struct hash_elem *e, void *hash_aux) {
-	struct thread *t = thread_current();
-	ASSERT(&t->spt == (struct supplemental_page_table *)hash_aux); //child's SPT
-
-	struct page *page = hash_entry(e, struct page, hash_elem);
-	enum vm_type type = page->operations->type; // type of page to copy
-
-	if(type == VM_UNINIT) {
-		struct uninit_page *uninit = &page->uninit;
-		vm_initializer *init = uninit->init;
-		void *aux = uninit->aux;
-
-		// copy aux (struct lazy_load_info *)
-		struct lazy_load_info *lazy_load_info = malloc(sizeof(struct lazy_load_info));
-		if(lazy_load_info == NULL) {
-			// #ifdef DBG
-			// malloc fail - kernel pool all used
-		}
-		memcpy(lazy_load_info, (struct lazy_load_info *)aux, sizeof(struct lazy_load_info));
-
-	
-		lazy_load_info->file = file_reopen(((struct lazy_load_info *)aux)->file); // get new struct file (calloc)
-		vm_alloc_page_with_initializer(uninit->type, page->va, page->writable, init, lazy_load_info);
-
-		// uninit page created by mmap - record page_cnt
-		if(uninit->type == VM_FILE) {
-			struct page *newpage = spt_find_page(&t->spt, page->va);
-			newpage->page_cnt = page->page_cnt;
-		}
-	}
-	if(type & VM_ANON == VM_ANON) { // include stack pages
-		// when __do_fork is called, thread_current is the child thread so we can just use vm_alloc_page
-		vm_alloc_page(type, page->va, page->writable);
-
-		struct page *newpage = spt_find_page(&t->spt, page->va); // copied page
-		vm_do_claim_page(newpage);
-
-		ASSERT(page->frame != NULL);
-		memcpy(newpage->frame->kva, page->frame->kva, PGSIZE);
-	}
-	if(type == VM_FILE) {
-		struct lazy_load_info *lazy_load_info = malloc(sizeof(struct lazy_load_info));
-
-		struct file_page *file_page = &page->file;
-		lazy_load_info->file = file_reopen(file_page->file);
-		lazy_load_info->page_read_bytes = file_page->length;
-		lazy_load_info->page_zero_bytes = PGSIZE - file_page->length;
-		lazy_load_info->offset = file_page->offset;
-		void *aux = lazy_load_info;
-		vm_alloc_page_with_initializer(type, page->va, page->writable, lazy_load_segment_for_file, aux);
-
-		struct page *newpage = spt_find_page(&t->spt, page->va); // copied page
-		vm_do_claim_page(newpage);
-
-		newpage->page_cnt = page->page_cnt;
-		newpage->writable = false;
-	}
+bool page_delete(struct hash *hash, struct page *page) {
+    return !hash_delete(hash, &page->hash_elem) ? true : false;
 }
 
-/* P3 추가 */
-// same as spt_remove_page except that it doesn't delete the page from SPT hash
-// only free page, not frame - just break the page-frame connection 
-void remove_page(struct page *page){
-	struct thread *t = thread_current();
-	pml4_clear_page(t->pml4, page->va);
-	// if(page->frame)
-	// 	free(page->frame);
-	if (page->frame != NULL){
-		page->frame->page = NULL;
-	}
-	// vm_dealloc_page (page);
-	// destroy(page); // uninit destroy - free aux
-	// free(page);
+void spt_destroy (struct hash_elem *e, void *aux UNUSED) {
+    struct page *page = hash_entry(e, struct page, hash_elem);
+
+    free(page);  
 }
 
-
-void hash_action_destroy (struct hash_elem *e, void *aux){
-	struct thread *t = thread_current();
-	struct page *page = hash_entry(e, struct page, hash_elem);
-	
-	// mmap-exit - process exits without calling munmap; unmap here
-	if(page->operations->type == VM_FILE){
-		if(pml4_is_dirty(t->pml4, page->va)){
-			struct file *file = page->file.file;
-			size_t length = page->file.length;
-			off_t offset = page->file.offset;
-
-			ASSERT(page->frame != NULL);
-
-			if(file_write_at(file, page->frame->kva, length, offset) != length){
-				// #ifdef DBG
-				// TODO - Not properly written-back
-			}
-		}
-	}
-	
-	if (page->frame != NULL){
-		page->frame->page = NULL;		
-	}
-	
-	// destroy(page);
-	// free(page->frame);
-	// free(page);
-
-	// pml4_clear_page(thread_current()->pml4, page->va);
-	remove_page(page);
-	
+void hash_action_destroy (struct hash_elem *e, void *aux UNUSED) {
+    struct page *page = hash_entry(e, struct page, hash_elem);
+    destroy(page);  
+    free(page);  
 }
