@@ -140,12 +140,14 @@ page_fault (struct intr_frame *f) {
 	write = (f->error_code & PF_W) != 0;
 	user = (f->error_code & PF_U) != 0;
 
+
 #ifdef VM
 	/* For project 3 and later. */
 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
 		return;
 #endif
 	exit(-1);
+    
 	/* Count page faults. */
 	page_fault_cnt++;
 
@@ -156,6 +158,5 @@ page_fault (struct intr_frame *f) {
 			write ? "writing" : "reading",
 			user ? "user" : "kernel");
 	kill (f);
-	// exit(-1);
 }
 

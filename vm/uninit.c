@@ -11,35 +11,38 @@
 #include "vm/vm.h"
 #include "vm/uninit.h"
 
-static bool uninit_initialize(struct page *page, void *kva);
-static void uninit_destroy(struct page *page);
+static bool uninit_initialize (struct page *page, void *kva);
+static void uninit_destroy (struct page *page);
 
 /* DO NOT MODIFY this struct */
 static const struct page_operations uninit_ops = {
-    .swap_in = uninit_initialize,
-    .swap_out = NULL,
-    .destroy = uninit_destroy,
-    .type = VM_UNINIT,
+	.swap_in = uninit_initialize,
+	.swap_out = NULL,
+	.destroy = uninit_destroy,
+	.type = VM_UNINIT,
 };
 
 /* DO NOT MODIFY this function */
-void uninit_new(struct page *page, void *va, vm_initializer *init,
-                enum vm_type type, void *aux,
-                bool (*initializer)(struct page *, enum vm_type, void *)) {
-    ASSERT(page != NULL);
+void
+uninit_new (struct page *page, void *va, vm_initializer *init,
+		enum vm_type type, void *aux,
+		bool (*initializer)(struct page *, enum vm_type, void *)) {
+	ASSERT (page != NULL);
 
-    *page = (struct page){
-        .operations = &uninit_ops,
-        .va = va,
-        .frame = NULL, /* no frame for now */
-        .uninit = (struct uninit_page){
-            .init = init,
-            .type = type,
-            .aux = aux,
-            .page_initializer = initializer,
-        }};
+	*page = (struct page) {
+		.operations = &uninit_ops,
+		.va = va,
+		.frame = NULL, /* no frame for now */
+		.uninit = (struct uninit_page) {
+			.init = init,
+			.type = type,
+			.aux = aux,
+			.page_initializer = initializer,
+		}
+	};
 }
 
+/* Initalize the page on first fault */
 static bool
 uninit_initialize (struct page *page, void *kva) {
 	struct uninit_page *uninit = &page->uninit;
@@ -59,12 +62,7 @@ uninit_initialize (struct page *page, void *kva) {
  * PAGE will be freed by the caller. */
 static void
 uninit_destroy (struct page *page) {
-	struct uninit_page *uninit  = &page->uninit;
+	struct uninit_page *uninit UNUSED = &page->uninit;
 	/* TODO: Fill this function.
 	 * TODO: If you don't have anything to do, just return. */
-	struct lazy_load_info * info = (struct lazy_load_info *)(uninit->aux);
-	file_close(&info->file);
-	
-	// 'file_close' frees 'info'
-	free(info); // malloc in 'process.c load_segment' or 'hash_action_copy'
 }

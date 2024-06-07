@@ -2,9 +2,8 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
-#include "hash.h"
-#include "threads/synch.h"
-struct list frame_table;
+#include "lib/kernel/hash.h"
+
 enum vm_type {
 	/* page not initialized */
 	VM_UNINIT = 0,
@@ -25,67 +24,66 @@ enum vm_type {
 	/* DO NOT EXCEED THIS VALUE. */
 	VM_MARKER_END = (1 << 31),
 };
-bool delete_page (struct hash *pages, struct page *p);
-unsigned page_hash(const struct hash_elem *p_, void *aux) ;
-bool page_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux );
-struct list frame_table; 
-void hash_action_copy (struct hash_elem *e, void *hash_aux);
-void hash_action_destroy (struct hash_elem *e, void *aux);
-void vm_stack_growth (void *addr);
+
 #include "vm/uninit.h"
 #include "vm/anon.h"
 #include "vm/file.h"
 #ifdef EFILESYS
 #include "filesys/page_cache.h"
 #endif
+
+struct page_operations;
 struct thread;
 
 #define VM_TYPE(type) ((type) & 7)
 
+// struct vm_entry {
+// 	uint8_t type;
+// 	void *vaddr;
+// 	bool writable;
+
+// 	bool is_loaded;
+// 	struct file* file;
+
+// 	struct list_elem mmap_elem;
+
+// 	size_t offset;
+// 	size_t read_byte;
+// 	size_t zero_byte;
+
+// 	size_t swap_slot;
+
+// 	struct hash_elem hash_elem;
+// };
 /* The representation of "page".
  * This is kind of "parent class", which has four "child class"es, which are
  * uninit_page, file_page, anon_page, and page cache (project4).
  * DO NOT REMOVE/MODIFY PREDEFINED MEMBER OF THIS STRUCTURE. */
-         struct lazy_load_info {
-        	struct file *file;
-        	size_t page_read_bytes;
-        	size_t page_zero_bytes;
-        	off_t offset;
-        };
 struct page {
-    const struct page_operations *operations;
-    	void *va;              /* Address in terms of user space */
-    	struct frame *frame;   /* Back reference for frame */
-    
-    	/* Your implementation */
-    	/* P3 추가 */
-    	struct hash_elem hash_elem; /* Hash table element for SPT */
-		struct list_elem list_elem;
-    	bool writable;
-    	int page_cnt; // only for file-mapped pages
-    
-    	/* Per-type data are binded into the union.
-    	 * Each function automatically detects the current union */
-    	union {
-    		struct uninit_page uninit;
-    		struct anon_page anon;
-    		struct file_page file;
-    #ifdef EFILESYS
-    		struct page_cache page_cache;
-    #endif
-    	};
+	const struct page_operations *operations;
+	void *va;              /* Address in terms of user space */
+	struct frame *frame;   /* Back reference for frame */
+
+	/* Your implementation */
+    struct hash_elem hash_elem;
+	bool writable;
+	/* Per-type data are binded into the union.
+	 * Each function automatically detects the current union */
+		struct uninit_page uninit;
+	union {
+		struct anon_page anon;
+		struct file_page file;
+#ifdef EFILESYS
+		struct page_cache page_cache;
+#endif
+	};
 };
+
 /* The representation of "frame" */
 struct frame {
-  void *kva; /* kernel virtual address */
-  struct page *page; 
-	struct list_elem elem;  // 추가
-};
-struct supplemental_page_table
-{
-	struct hash spt_hash;
-	    struct hash pages; // 새로운 pages 해시 테이블 추가
-
+	void *kva;
+	struct page *page;
+	struct list_elem frame_elem;
 };
 
 /* The function table for page operations.
@@ -107,10 +105,11 @@ struct page_operations {
 /* Representation of current process's memory space.
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
-
+struct supplemental_page_table {
+	struct hash spt_hash;
+};
 
 #include "threads/thread.h"
-
 void supplemental_page_table_init (struct supplemental_page_table *spt);
 bool supplemental_page_table_copy (struct supplemental_page_table *dst,
 		struct supplemental_page_table *src);
@@ -131,6 +130,5 @@ bool vm_alloc_page_with_initializer (enum vm_type type, void *upage,
 void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
-
 
 #endif  /* VM_VM_H */

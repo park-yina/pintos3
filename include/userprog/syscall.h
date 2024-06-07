@@ -3,11 +3,10 @@
 #include "threads/synch.h"
 #include <stdbool.h>
 #include "threads/thread.h"
-#include "intrinsic.h"
+// #include "intrinsic.h"
 
 
-struct lock filesys_lock;
-
+// struct lock filesys_lock;
 void syscall_init (void);
 void check_address(void *addr);
 void halt(void);
@@ -24,7 +23,5 @@ void close(int fd);
 tid_t fork(const char *thread_name, struct intr_frame *f);
 int exec(const char *cmd_line);
 int wait(tid_t pid);
-
-void check_address(void *addr);
 
 #endif /* userprog/syscall.h */

@@ -10,7 +10,6 @@
 #include "threads/palloc.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
-#include "vm/file.h"
 #include "kernel/stdio.h"
 #include "userprog/gdt.h"
 #include "threads/flags.h"
@@ -314,21 +313,10 @@ void close(int fd)
 	process_close_file(fd);
 }
 
-void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
-	// Fail : map to i/o console, zero length, map at 0, addr not page-aligned
-	if(fd == 0 || fd == 1 || length == 0 || addr == 0 || pg_ofs(addr) != 0 || offset > PGSIZE)
-		return NULL;
+int mmap(int fd, void *addr){
 
-	// Find file by fd
-	struct file *file = find_file_by_fd(fd);	
-
-	// Fail : NULL file, file length is zero
-	if (file == NULL || file_length(file) == 0)
-		return NULL;
-
-	return do_mmap(addr, length, writable, file, offset);
 }
 
-void munmap (void *addr){
-	do_munmap(addr);
-}
+// void munmap(mapid_t mapid){
+
+// }

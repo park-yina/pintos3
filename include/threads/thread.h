@@ -1,11 +1,12 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
-
+#define VM
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
 #include "threads/interrupt.h"
+#include "lib/kernel/hash.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -99,7 +100,6 @@ struct thread {
 
 	// Alarm clock
 	int64_t wakeup_tick;                      /* Priority. */
-	int64_t wake_up_tick;                      /* Priority. */
 
 	// Priority Scheduling
 	int priority;
@@ -110,11 +110,6 @@ struct thread {
 	int recent_cpu;
 	struct list_elem d_elem;
 	struct list_elem a_elem;
-    struct list_elem donation_elem;	
-	struct file **fd_table;   /* allocated in thread_create */	
-	struct list_elem child_elem; /* elem for this thread's parent's child_list */
-	struct list donation_list; /* list of threads that donate priority to **this thread** */
-	int initial_priority; /* thread's initial priority */
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
@@ -123,7 +118,6 @@ struct thread {
 
 	struct file **file_descriptor_table;
 	int fdidx;
-	int fd_idx;                     /* for open file's fd in fd_table */
 
 	struct list child_list;
 	struct list_elem child_list_elem;
@@ -132,10 +126,8 @@ struct thread {
 	struct semaphore child_sema;
 	struct semaphore exit_sema; 
 	struct semaphore wait_sema;
-	struct semaphore fork_sema; /* parent thread should wait while child thread copy parent */
-	struct semaphore free_sema;
-	struct file *running;
 
+	struct file *running;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -144,23 +136,12 @@ struct thread {
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
+	void *rsp;
 #endif
 
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
-	uint64_t rsp; // a page fault occurs in the kernel
-
-};
-struct thread_file {
-	struct file* file;
-	int fd;
-	struct list_elem elem;
-	//for dup2, default -1
-	int dup_tag;
-	int dup_cnt;
-	//for stdin and stdout
-	int std;
 };
 
 /* If false (default), use round-robin scheduler.
