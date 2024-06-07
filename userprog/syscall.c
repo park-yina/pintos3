@@ -63,6 +63,20 @@ void syscall_init(void)
 	write_msr(MSR_SYSCALL_MASK,
 			  FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
+	// Fail : map to i/o console, zero length, map at 0, addr not page-aligned
+	if(fd == 0 || fd == 1 || length == 0 || addr == 0 || pg_ofs(addr) != 0 || offset > PGSIZE)
+		return NULL;
+
+	// Find file by fd
+	struct file *file = find_file_by_fd(fd);	
+
+	// Fail : NULL file, file length is zero
+	if (file == NULL || file_length(file) == 0)
+		return NULL;
+
+	return do_mmap(addr, length, writable, file, offset);
+}
 void munmap (void *addr){
 	do_munmap(addr);
 }
@@ -130,25 +144,6 @@ void syscall_handler(struct intr_frame *f UNUSED)
 	
 	// thread_exit ();
 }
-static void*
-mmap (void *addr, size_t length, int writable, int fd, off_t offset){
-	//Handle all parameter error and pass it to do_mmap
-	if (addr == 0 || (!is_user_vaddr(addr))) return NULL;
-	if ((uint64_t)addr % PGSIZE != 0) return NULL;
-	if (offset % PGSIZE != 0) return NULL;
-	if ((uint64_t)addr + length == 0) return NULL;
-	if (!is_user_vaddr((uint64_t)addr + length)) return NULL;
-	for (uint64_t i = (uint64_t) addr; i < (uint64_t) addr + length; i += PGSIZE){
-		if (spt_find_page (&thread_current() -> spt, (void*) i)!=NULL) return NULL;
-	}
-	struct thread_file* tf = process_get_file (fd);
-	if (tf == NULL) return NULL;
-	if (tf->std == 0 || tf->std == 1) return NULL;
-	if (length == 0) return NULL;
-	struct file* file = tf->file;
-	return do_mmap(addr, length, writable, file, offset);
-}
-
 
 void check_address(void *addr)
 {
