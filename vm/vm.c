@@ -338,6 +338,7 @@ void hash_action_destroy (struct hash_elem *e, void *aux UNUSED) {
     destroy(page);  
     free(page);  
 }
+
 bool lazy_load_segment_for_file(struct page *page, void *aux) {
     /* Load the segment from the file */
     /* This is called when the first page fault occurs on address VA. */
@@ -436,4 +437,7 @@ do_mmap (void *addr, size_t length, int writable,
 	}
 
 	return start_addr;
+}
+void
+do_munmap (void *addr) {
 }
