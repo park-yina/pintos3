@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 #include "lib/kernel/hash.h"
-#include "off_t.h"
+#include "filesys/off_t.h"
 
 struct lazy_load_info {
 	struct file *file;

@@ -4,7 +4,7 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
-#include "off_t.h"
+#include "filesys/off_t.h"
 #include "lib/kernel/hash.h"
 #include "lib/round.h"
 #include "threads/vaddr.h"
