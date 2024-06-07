@@ -3,7 +3,17 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 #include "lib/kernel/hash.h"
-
+struct lazy_load_info {
+	struct file *file;
+	size_t page_read_bytes;
+	size_t page_zero_bytes;
+	off_t offset;
+};
+bool
+lazy_load_segment_for_file(struct page *page, void *aux);
+void *
+do_mmap (void *addr, size_t length, int writable,
+		struct file *file, off_t offset);
 enum vm_type {
 	/* page not initialized */
 	VM_UNINIT = 0,
@@ -63,7 +73,7 @@ struct page {
 	const struct page_operations *operations;
 	void *va;              /* Address in terms of user space */
 	struct frame *frame;   /* Back reference for frame */
-
+	size_t page_cnt;
 	/* Your implementation */
     struct hash_elem hash_elem;
 	bool writable;
