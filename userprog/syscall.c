@@ -34,8 +34,6 @@ void syscall_handler(struct intr_frame *);
 #define STDIN_fileNO 0
 #define STDOUT_fileNO 1
 
-void *mmap (void *addr, size_t length, int writable, int fd, off_t offset);
-void munmap (void *addr);
 void check_address(void *addr);
 void halt(void);
 void exit(int status);
@@ -52,6 +50,25 @@ int fork(const char *thread_name, struct intr_frame *f);
 int exec(const char *cmd_line);
 int wait(int pid);
 
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
+	// Fail : map to i/o console, zero length, map at 0, addr not page-aligned
+	if(fd == 0 || fd == 1 || length == 0 || addr == 0 || pg_ofs(addr) != 0 || offset > PGSIZE)
+		return NULL;
+
+	// Find file by fd
+	struct file *file = find_file_by_fd(fd);	
+
+	// Fail : NULL file, file length is zero
+	if (file == NULL || file_length(file) == 0)
+		return NULL;
+
+	return do_mmap(addr, length, writable, file, offset);
+}
+
+// Project 3-3 mmap
+void munmap (void *addr){
+	do_munmap(addr);
+}
 static struct file *find_file_by_fd(int fd)
 {
 	struct thread *cur = thread_current();
@@ -380,22 +397,4 @@ void close(int fd)
 	}
 	file_close(file);
 	process_close_file(fd);
-}void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
-	// Fail : map to i/o console, zero length, map at 0, addr not page-aligned
-	if(fd == 0 || fd == 1 || length == 0 || addr == 0 || pg_ofs(addr) != 0 || offset > PGSIZE)
-		return NULL;
-
-	// Find file by fd
-	struct file *file = find_file_by_fd(fd);	
-
-	// Fail : NULL file, file length is zero
-	if (file == NULL || file_length(file) == 0)
-		return NULL;
-
-	return do_mmap(addr, length, writable, file, offset);
-}
-
-// Project 3-3 mmap
-void munmap (void *addr){
-	do_munmap(addr);
 }
