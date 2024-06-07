@@ -10,6 +10,7 @@
 #include "threads/palloc.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "vm/file.h"
 #include "kernel/stdio.h"
 #include "userprog/gdt.h"
 #include "threads/flags.h"
@@ -18,6 +19,7 @@
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
+struct lock filesys_lock;
 
 /* System call.
  *
@@ -50,41 +52,12 @@ int fork(const char *thread_name, struct intr_frame *f);
 int exec(const char *cmd_line);
 int wait(int pid);
 
-static struct file *find_file_by_fd(int fd)
-{
-	struct thread *cur = thread_current();
-
-	// Error - invalid fd
-	if (fd < 0 || fd >= FDT_COUNT_LIMIT)
-		return NULL;
-
-	return cur->fd_table[fd]; // automatically returns NULL if empty
-}
-void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
-	// Fail : map to i/o console, zero length, map at 0, addr not page-aligned
-	if(fd == 0 || fd == 1 || length == 0 || addr == 0 || pg_ofs(addr) != 0 || offset > PGSIZE)
-		return NULL;
-
-	// Find file by fd
-	struct file *file = find_file_by_fd(fd);	
-
-	// Fail : NULL file, file length is zero
-	if (file == NULL || file_length(file) == 0)
-		return NULL;
-
-	return do_mmap(addr, length, writable, file, offset);
-}
-
-// Project 3-3 mmap
-void munmap (void *addr){
-	do_munmap(addr);
-}
 void syscall_init(void)
 {
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48 |
 							((uint64_t)SEL_KCSEG) << 32);
 	write_msr(MSR_LSTAR, (uint64_t)syscall_entry);
-	// lock_init(&filesys_lock);
+	lock_init(&filesys_lock);
 
 	/* The interrupt service rountine should not serve any interrupts
 	 * until the syscall_entry swaps the userland stack to the kernel
@@ -92,13 +65,14 @@ void syscall_init(void)
 	write_msr(MSR_SYSCALL_MASK,
 			  FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
+
 /* The main system call interface */
-void syscall_handler(struct intr_frame *f)
+void syscall_handler(struct intr_frame *f UNUSED)
 {
 	int syscall_num = f->R.rax;
 
 	check_address(f->rsp);
-
+	thread_current()->rsp = f->rsp;
 	switch (syscall_num)
 	{
 	case SYS_HALT:
@@ -143,17 +117,7 @@ void syscall_handler(struct intr_frame *f)
 	case SYS_CLOSE:
 		close(f->R.rdi);
 		break;
-	case SYS_MMAP:
-			f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
-			break;
-	case SYS_MUNMAP:
-			munmap(f->R.rdi);
-			break;
-	default:
-			exit(-1);
-			break;
 	}
-	
 	// thread_exit ();
 }
 
@@ -166,8 +130,8 @@ void check_address(void *addr)
 	if (!is_user_vaddr(addr))
 		exit(-1);
 	// 현재 스레드의 페이지 맵 레벨 4(pml4)를 확인하여 주어진 주소에 대한 페이지가 있는지 확인하는 pml4_get_page 함수를 호출 만약 해당 주소에 대한 페이지가 없다면 EXIT
-	if (pml4_get_page(thread_current()->pml4, addr) == NULL)
-		exit(-1);
+	// if (pml4_get_page(thread_current()->pml4, addr) == NULL)
+	// 	exit(-1);
 }
 
 void halt(void)
@@ -268,88 +232,56 @@ int read(int fd, void *buffer, unsigned size)
 
 	if(file == NULL)
 		return -1;
-	
 	if (fd == STDIN_fileNO){
 		char *input;
 
 		for (int i = 0 ; i < size ; i++){
 			input = input_getc();
 			if (input == "\n")
-				break;
+				break;	
 			*buf = input;
 			buf++;
 			byte++;
 		}
 	}
 	else{
-		// lock_acquire(&filesys_lock);
+		struct page *page = spt_find_page(&thread_current()->spt, buffer);
+
+		if (page != NULL && !page->writable)
+			exit(-1);
+
+		lock_acquire(&filesys_lock);
 		byte = file_read(file, buffer, size);
-		// lock_release(&filesys_lock);
+		lock_release(&filesys_lock);
 	}
 	return byte;
 }
 
-int write(int fd, const void *buffer, unsigned size)
-{
-	check_address(buffer);
+int write(int fd, const void *buffer, unsigned size) {
+    check_address(buffer);
+    if (fd == STDIN_fileNO) {
+        return -1;
+    }
 
-	// lock_acquire(&filesys_lock);
-	
-	if (fd == STDIN_fileNO){
-		// lock_release(&filesys_lock);
-		return -1;
-	}
+    if (fd == STDOUT_fileNO) {
+        putbuf(buffer, size);
+        return size;
+    }
 
+    struct file *file = process_get_file(fd);
+    if (file == NULL) {
+        return -1;
+    }
 
-	if (fd == STDOUT_fileNO)
-	{
-		putbuf(buffer, size);
-		// lock_release(&filesys_lock);
-		return size;
-	}
+    int byte;
 
-	int byte;
-	struct file *file = process_get_file(fd);
+    lock_acquire(&filesys_lock);
+    byte = (int)file_write(file, buffer, size);
+    lock_release(&filesys_lock);
 
-	if(file == NULL){
-		// lock_release(&filesys_lock);
-		return -1; 
-	}
-	
-	// lock_release(&filesys_lock);
-	
-	return (int)file_write(file, buffer, size);
+    return byte;
 }
 
-// int write(int fd, const void *buffer, unsigned size)
-// {
-// 	check_address(buffer);
-// 	int byte;
-
-// 	if (fd == STDIN_fileNO){
-// 		return -1;
-// 	}
-
-// 	struct file *file = process_get_file(fd);
-	
-// 	if(file == NULL){
-// 		return -1; 
-// 	}
-
-// 	// lock_acquire(&filesys_lock);
-
-// 	if (fd == STDOUT_fileNO)
-// 	{
-// 		putbuf(buffer, size);
-// 		byte = size;
-// 	}
-
-// 	byte = (int)file_write(file, buffer, size);
-	
-// 	// lock_release(&filesys_lock);
-	
-// 	return byte;
-// }
 
 void seek(int fd, unsigned position)
 {
@@ -380,4 +312,23 @@ void close(int fd)
 	}
 	file_close(file);
 	process_close_file(fd);
+}
+
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
+	// Fail : map to i/o console, zero length, map at 0, addr not page-aligned
+	if(fd == 0 || fd == 1 || length == 0 || addr == 0 || pg_ofs(addr) != 0 || offset > PGSIZE)
+		return NULL;
+
+	// Find file by fd
+	struct file *file = find_file_by_fd(fd);	
+
+	// Fail : NULL file, file length is zero
+	if (file == NULL || file_length(file) == 0)
+		return NULL;
+
+	return do_mmap(addr, length, writable, file, offset);
+}
+
+void munmap (void *addr){
+	do_munmap(addr);
 }
