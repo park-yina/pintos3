@@ -2,16 +2,10 @@
 
 #include "threads/malloc.h"
 #include "vm/vm.h"
+#include "userprog/process.h"
 #include "vm/inspect.h"
 #include "threads/vaddr.h"
 #include "vm/file.h"
-bool delete_page (struct hash *pages, struct page *p);
-unsigned page_hash(const struct hash_elem *p_, void *aux UNUSED);
-bool page_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
-struct list frame_table; 
-void hash_action_copy (struct hash_elem *e, void *hash_aux);
-void hash_action_destroy (struct hash_elem *e, void *aux);
-static void vm_stack_growth (void *addr UNUSED);
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
