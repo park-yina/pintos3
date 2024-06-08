@@ -71,7 +71,7 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
 		return NULL;
 
 	// Find file by fd
-	struct file *file = find_file_by_fd(fd);	
+	struct file *file = process_get_file(fd);	
 
 	// Fail : NULL file, file length is zero
 	if (file == NULL || file_length(file) == 0)
@@ -118,6 +118,13 @@ do_munmap (void *addr) {
 		page = spt_find_page(&t->spt, addr);
 	}
 }
+
+static void
+munmap (void* addr){
+	do_munmap(addr);
+}
+
+static void munmap (void* addr);
 /* The main system call interface */
 void syscall_handler(struct intr_frame *f UNUSED)
 {
@@ -353,6 +360,7 @@ void seek(int fd, unsigned position)
 	if (file == NULL)
 		return -1;
 	file_seek(file, position);
+
 }
 
 unsigned
