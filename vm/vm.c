@@ -340,7 +340,7 @@ void hash_action_destroy (struct hash_elem *e, void *aux UNUSED) {
 }
 unsigned page_hash(const struct hash_elem *p_, void *aux UNUSED)
 {
-    const struct page *p = hash_entry(p_, struct page, h_elem);
+    const struct page *p = hash_entry(p_, struct page, hash_elem);
     return hash_bytes(&p->va, sizeof p->va);
 }
 
