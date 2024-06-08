@@ -65,7 +65,59 @@ void syscall_init(void)
 	write_msr(MSR_SYSCALL_MASK,
 			  FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
+	// Fail : map to i/o console, zero length, map at 0, addr not page-aligned
+	if(fd == 0 || fd == 1 || length == 0 || addr == 0 || pg_ofs(addr) != 0 || offset > PGSIZE)
+		return NULL;
 
+	// Find file by fd
+	struct file *file = find_file_by_fd(fd);	
+
+	// Fail : NULL file, file length is zero
+	if (file == NULL || file_length(file) == 0)
+		return NULL;
+
+	return do_mmap(addr, length, writable, file, offset);
+}
+void
+do_munmap (void *addr) {
+	struct thread *t = thread_current();
+	struct page *page;
+
+	page = spt_find_page(&t->spt, addr);
+	//int prev_cnt = 0;
+	int prev_cnt = page->page_cnt - 1; //if the file size is bigger than memmory space, first page of consecutive file-pages in memory is not the first page of the file.
+
+	// Check if the page is file_page or uninit_page to be transmuted into file_page and then its consecutive
+	while(page != NULL 
+		&& (page->operations->type == VM_FILE 
+			|| (page->operations->type == VM_UNINIT && page->uninit.type == VM_FILE))
+		&& page->page_cnt == prev_cnt + 1){
+		if(pml4_is_dirty(t->pml4, addr)){
+			struct file *file = page->file.file;
+			size_t length = page->file.length;
+			off_t offset = page->file.offset;
+
+			if(file_write_at(file, addr, length, offset) != length){
+				// #ifdef DBG
+				// TODO - Not properly written-back
+			}
+		}	
+
+		prev_cnt = page->page_cnt;
+
+		// removed from the process's list of virtual pages.
+		// pml4_clear_page(thread_current()->pml4, page->va);
+		// destroy(page);
+		// free(page->frame);
+		// free(page);
+		//remove_page(page);
+		spt_remove_page(&t->spt, page);
+
+		addr += PGSIZE;
+		page = spt_find_page(&t->spt, addr);
+	}
+}
 /* The main system call interface */
 void syscall_handler(struct intr_frame *f UNUSED)
 {
@@ -117,7 +169,17 @@ void syscall_handler(struct intr_frame *f UNUSED)
 	case SYS_CLOSE:
 		close(f->R.rdi);
 		break;
-	}
+	case SYS_MMAP:
+        f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+        break;
+
+    case SYS_MUNMAP:
+        munmap(f->R.rdi);
+        break;
+
+    default:
+        break;
+    }
 	// thread_exit ();
 }
 
@@ -313,57 +375,4 @@ void close(int fd)
 	
 	file_close(file);
 	process_close_file(fd);
-}
-void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
-	// Fail : map to i/o console, zero length, map at 0, addr not page-aligned
-	if(fd == 0 || fd == 1 || length == 0 || addr == 0 || pg_ofs(addr) != 0 || offset > PGSIZE)
-		return NULL;
-
-	// Find file by fd
-	struct file *file = find_file_by_fd(fd);	
-
-	// Fail : NULL file, file length is zero
-	if (file == NULL || file_length(file) == 0)
-		return NULL;
-
-	return do_mmap(addr, length, writable, file, offset);
-}
-void
-do_munmap (void *addr) {
-	struct thread *t = thread_current();
-	struct page *page;
-
-	page = spt_find_page(&t->spt, addr);
-	//int prev_cnt = 0;
-	int prev_cnt = page->page_cnt - 1; //if the file size is bigger than memmory space, first page of consecutive file-pages in memory is not the first page of the file.
-
-	// Check if the page is file_page or uninit_page to be transmuted into file_page and then its consecutive
-	while(page != NULL 
-		&& (page->operations->type == VM_FILE 
-			|| (page->operations->type == VM_UNINIT && page->uninit.type == VM_FILE))
-		&& page->page_cnt == prev_cnt + 1){
-		if(pml4_is_dirty(t->pml4, addr)){
-			struct file *file = page->file.file;
-			size_t length = page->file.length;
-			off_t offset = page->file.offset;
-
-			if(file_write_at(file, addr, length, offset) != length){
-				// #ifdef DBG
-				// TODO - Not properly written-back
-			}
-		}	
-
-		prev_cnt = page->page_cnt;
-
-		// removed from the process's list of virtual pages.
-		// pml4_clear_page(thread_current()->pml4, page->va);
-		// destroy(page);
-		// free(page->frame);
-		// free(page);
-		//remove_page(page);
-		spt_remove_page(&t->spt, page);
-
-		addr += PGSIZE;
-		page = spt_find_page(&t->spt, addr);
-	}
 }

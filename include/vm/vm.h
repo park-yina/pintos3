@@ -118,6 +118,13 @@ struct page_operations {
 struct supplemental_page_table {
 	struct hash spt_hash;
 };
+struct necessary_info
+{
+    struct file *file;
+    off_t ofs;
+    uint32_t read_byte;
+    uint32_t zero_byte;
+};
 
 #include "threads/thread.h"
 void supplemental_page_table_init (struct supplemental_page_table *spt);

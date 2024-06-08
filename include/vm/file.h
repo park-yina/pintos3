@@ -10,6 +10,12 @@ struct file_page {
     	struct file *file;
     	size_t length;
     	off_t offset;
+		    void *aux;
+    void *va;
+    size_t read_bytes;
+    size_t zero_bytes;
+	    enum vm_type type;
+
 };
 
 void vm_file_init (void);
