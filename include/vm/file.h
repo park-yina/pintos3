@@ -15,6 +15,8 @@ struct file_page {
     size_t read_bytes;
     size_t zero_bytes;
 	    enum vm_type type;
+		    struct list_elem file_elem;
+
 
 };
 
