@@ -350,8 +350,7 @@ bool page_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux
     const struct page *b = hash_entry(b_, struct page, hash_elem);
 
     return a->va < b->va;
-}
-void *
+}void *
 do_mmap(void *addr, size_t length, int writable,
         struct file *file, off_t offset)
 {
