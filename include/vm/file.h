@@ -19,6 +19,8 @@ struct file_page {
 
 
 };
+struct lock file_lock;
+
 
 void vm_file_init (void);
 bool file_backed_initializer (struct page *page, enum vm_type type, void *kva);
