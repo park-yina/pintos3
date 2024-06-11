@@ -125,6 +125,8 @@ struct necessary_info
     uint32_t read_byte;
     uint32_t zero_byte;
 };
+struct lock vm_lock;
+
 
 #include "threads/thread.h"
 void supplemental_page_table_init (struct supplemental_page_table *spt);

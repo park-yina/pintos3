@@ -50,7 +50,7 @@ bool file_backed_initializer(struct page *page, enum vm_type type, void *kva)
 static bool
 file_backed_swap_in(struct page *page, void *kva)
 {
-    struct file_page *file_page UNUSED = &page->file;
+    struct file_page *file_page = &page->file;
     struct necessary_info *nec = (struct necessary_info *)file_page->aux;
 
     file_seek(nec->file, nec->ofs);
