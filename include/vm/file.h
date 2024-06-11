@@ -15,12 +15,8 @@ struct file_page {
     size_t read_bytes;
     size_t zero_bytes;
 	    enum vm_type type;
-		    struct list_elem file_elem;
-
 
 };
-struct lock file_lock;
-
 
 void vm_file_init (void);
 bool file_backed_initializer (struct page *page, enum vm_type type, void *kva);

@@ -116,8 +116,8 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 
 /* Insert PAGE into spt with validation. */
 bool
-spt_insert_page (struct supplemental_page_table *spt UNUSED,
-		struct page *page UNUSED) {
+spt_insert_page (struct supplemental_page_table *spt,
+		struct page *page) {
 	int succ = false;
 	/* TODO: Fill this function. */
 	struct hash_elem *elem = hash_insert(&spt->spt_hash, &page->hash_elem);
@@ -134,57 +134,22 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 
 /* Get the struct frame, that will be evicted. */
 static struct frame *
-vm_get_victim(void)
-{
-    struct frame *victim = NULL;
-    /* TODO: The policy for eviction is up to you. */
-
-    /* FIFO */
-    // lock_acquire(&vm_lock);
-    // struct list_elem *e = list_pop_front(&frame_table);
-    // lock_release(&vm_lock);
-    // victim = list_entry(e, struct frame, f_elem);
-
-    /* Clock Algorithm */
-
-    struct list_elem *e;
-    lock_acquire(&vm_lock);
-    for (e = list_begin(&frame_table); e != list_end(&frame_table); e = list_next(e))
-    {
-        victim = list_entry(e, struct frame, frame_elem);
-        if (victim->page == NULL)
-        {
-            lock_release(&vm_lock);
-            return victim;
-        }
-        if (pml4_is_accessed(thread_current()->pml4, victim->page->va))
-            pml4_set_accessed(thread_current()->pml4, victim->page->va, 0);
-
-        else
-        {
-            lock_release(&vm_lock);
-            return victim;
-        }
-    }
-    lock_release(&vm_lock);
-    return victim;
+vm_get_victim (void) {
+	 /* TODO: The policy for eviction is up to you. */
+	//FIFO
+	struct list_elem *e = list_pop_front(&frame_table);
+	struct frame *victim = list_entry(e, struct frame, frame_elem);
+	return victim;
 }
-
 
 /* Evict one page and return the corresponding frame.
  * Return NULL on error.*/
 static struct frame *
-vm_evict_frame(void)
-{
-    struct frame *victim = vm_get_victim();
-    /* TODO: swap out the victim and return the evicted frame. */
-    if (swap_out(victim->page))
-    {
-        // list_push_back(&frame_table, &victim->f_elem); // FIFO
-        return victim;
-    }
-
-    return NULL;
+vm_evict_frame (void) {
+	struct frame *victim = vm_get_victim ();
+	/* TODO: swap out the victim and return the evicted frame. */
+	swap_out(victim->page);
+	return victim;
 }
 
 /* palloc() and get frame. If there is no available page, evict the page
@@ -192,32 +157,24 @@ vm_evict_frame(void)
  * memory is full, this function evicts the frame to get the available memory
  * space.*/
 static struct frame *
-vm_get_frame(void)
-{
-    struct frame *frame = NULL;
-    /* TODO: Fill this function. */
-    void *kva;
-    struct page *page = NULL;
+vm_get_frame (void) {
+	/* TODO: Fill this function. */
+	struct frame *frame = (struct frame*)malloc(sizeof(struct frame));
+    frame->kva = palloc_get_page(PAL_USER);
 
-    kva = palloc_get_page(PAL_USER);
-    if (kva == NULL)
-    {
-        struct frame *victim = vm_evict_frame();
-        victim->page = NULL;
-        return victim;
+    if (frame->kva == NULL) {
+        frame = vm_evict_frame();
+        frame->page = NULL;
+
+        return frame;
     }
 
-    frame = (struct frame *)malloc(sizeof(struct frame));
-    frame->kva = kva;
-    frame->page = page;
-
-    lock_acquire(&vm_lock);
     list_push_back(&frame_table, &frame->frame_elem);
-    lock_release(&vm_lock);
+    frame->page = NULL;
 
-    ASSERT(frame != NULL);
-    ASSERT(frame->page == NULL);
-    return frame;
+	ASSERT (frame != NULL);
+	ASSERT (frame->page == NULL);
+	return frame;
 }
 
 /* Growing the stack. */
@@ -393,7 +350,8 @@ bool page_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux
     const struct page *b = hash_entry(b_, struct page, hash_elem);
 
     return a->va < b->va;
-}void *
+}
+void *
 do_mmap(void *addr, size_t length, int writable,
         struct file *file, off_t offset)
 {
