@@ -289,48 +289,43 @@ int filesize(int fd)
 	file_length(file);
 }
 
-int read(int fd, void *buffer, unsigned size) {
-	if (fd < 2) {
-		printf("Invalid file descriptor: %d\n", fd);
+int read(int fd, void *buffer, unsigned size)
+{
+	if (fd < 2)
 		return -1;
-	}
 	check_address(buffer);
 
-	int byte = 0;
+	int byte;
 	unsigned char *buf = buffer;
 	struct file *file = process_get_file(fd);
 
-	if (file == NULL) {
-		printf("File not found for file descriptor: %d\n", fd);
+	if(file == NULL)
 		return -1;
-	}
-	if (fd == STDIN_FILENO) {
-		char input;
+	if (fd == STDIN_fileNO){
+		char *input;
 
-		for (unsigned i = 0; i < size; i++) {
+		for (int i = 0 ; i < size ; i++){
 			input = input_getc();
-			if (input == '\n')
-				break;
+			if (input == "\n")
+				break;	
 			*buf = input;
 			buf++;
 			byte++;
 		}
-		printf("Read %d bytes from STDIN\n", byte);
-	} else {
+	}
+	else{
 		struct page *page = spt_find_page(&thread_current()->spt, buffer);
 
-		if (page != NULL && !page->writable) {
-			printf("Page not writable\n");
+		if (page != NULL && !page->writable)
 			exit(-1);
-		}
 
 		lock_acquire(&filesys_lock);
 		byte = file_read(file, buffer, size);
 		lock_release(&filesys_lock);
-		printf("Read %d bytes from file descriptor: %d\n", byte, fd);
 	}
 	return byte;
 }
+
 int write(int fd, const void *buffer, unsigned size) {
     check_address(buffer);
     if (fd == STDIN_fileNO) {
